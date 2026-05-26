@@ -28,6 +28,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             PanelManager.shared.removeBanner(id: id)
         }
 
+        // Auto-dismiss all banners when user switches to a terminal app.
+        NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.didActivateApplicationNotification,
+            object: nil,
+            queue: .main
+        ) { notification in
+            guard let app = notification.userInfo?[NSWorkspace.applicationUserInfoKey]
+                    as? NSRunningApplication else { return }
+            let terminals: Set<String> = ["Terminal", "iTerm2", "iTerm",
+                                          "Alacritty", "Kitty", "WezTerm", "Hyper"]
+            if terminals.contains(app.localizedName ?? "") {
+                let name = app.localizedName ?? "?"
+                Task { @MainActor in
+                    Logger.log("TERMINAL_FOCUSED app=\(name) — clearing banners")
+                    PanelManager.shared.clearAll()
+                }
+            }
+        }
+
         let server = HTTPServer(port: port)
         server.handler = { method, path, body in
             Self.route(method: method, path: path, body: body)
