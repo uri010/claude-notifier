@@ -74,7 +74,7 @@ is_terminal_focused() {
         'tell application "System Events" to return name of first application process whose frontmost is true' \
         2>/dev/null)" || return 1
     case "$frontmost" in
-        Terminal|iTerm2|iTerm|Alacritty|Kitty|WezTerm|Hyper) return 0 ;;
+        Terminal|터미널|iTerm2|iTerm|Alacritty|Kitty|WezTerm|Hyper) return 0 ;;
         *) return 1 ;;
     esac
 }

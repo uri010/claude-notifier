@@ -28,24 +28,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             PanelManager.shared.removeBanner(id: id)
         }
 
-        // Auto-dismiss all banners when user switches to a terminal app.
-        NSWorkspace.shared.notificationCenter.addObserver(
-            forName: NSWorkspace.didActivateApplicationNotification,
-            object: nil,
-            queue: .main
-        ) { notification in
-            guard let app = notification.userInfo?[NSWorkspace.applicationUserInfoKey]
-                    as? NSRunningApplication else { return }
-            let terminals: Set<String> = ["Terminal", "iTerm2", "iTerm",
-                                          "Alacritty", "Kitty", "WezTerm", "Hyper"]
-            if terminals.contains(app.localizedName ?? "") {
-                let name = app.localizedName ?? "?"
+        // Auto-dismiss banners when the user switches to a terminal app.
+        // Use RunLoop.main with .common mode so the timer fires in all run-loop modes.
+        Logger.log("WORKSPACE_CHECK frontmost=\(NSWorkspace.shared.frontmostApplication?.localizedName ?? "nil")")
+        let terminals: Set<String> = ["Terminal", "터미널", "iTerm2", "iTerm",
+                                      "Alacritty", "Kitty", "WezTerm", "Hyper"]
+        var prevWasTerminal = false
+        let focusTimer = Timer(timeInterval: 1.5, repeats: true) { _ in
+            let name = NSWorkspace.shared.frontmostApplication?.localizedName ?? ""
+            let isTerminal = terminals.contains(name)
+            if isTerminal && !prevWasTerminal {
                 Task { @MainActor in
                     Logger.log("TERMINAL_FOCUSED app=\(name) — clearing banners")
                     PanelManager.shared.clearAll()
                 }
             }
+            prevWasTerminal = isTerminal
         }
+        RunLoop.main.add(focusTimer, forMode: .common)
 
         let server = HTTPServer(port: port)
         server.handler = { method, path, body in
