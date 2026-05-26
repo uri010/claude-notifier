@@ -10,8 +10,17 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-HOOK="$SCRIPT_DIR/notify-hook.sh"
+HOOK_ABS="$SCRIPT_DIR/notify-hook.sh"
 SETTINGS="$HOME/.claude/settings.json"
+
+# $HOME-relative path so it works on any machine after cloning.
+# Shell expands $HOME at hook execution time, so changing the clone location
+# only requires re-running this script.
+if [[ "$HOOK_ABS" == "$HOME/"* ]]; then
+    HOOK="\$HOME/${HOOK_ABS#"$HOME/"}"
+else
+    HOOK="$HOOK_ABS"   # fallback: use absolute path if outside $HOME
+fi
 
 MATCHER="Bash|Write|Edit|MultiEdit|NotebookEdit"
 [ "${1:-}" = "--all" ] && MATCHER="*"
