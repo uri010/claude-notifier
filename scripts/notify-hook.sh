@@ -220,6 +220,12 @@ case "$HOOK_TYPE" in
     is_terminal_focused && exit 0   # 터미널 보고 있으면 배너 불필요
     MSG="$(field '.message' | head -c 300)"
     [ -z "$MSG" ] && exit 0   # 빈 메시지는 무시
+    log "notification msg=$(printf '%s' "$MSG" | head -1 | head -c 120)"
+    # "Claude is waiting" 계열 상태 메시지는 배너 불필요
+    if printf '%s' "$MSG" | grep -qiE 'claude is waiting|waiting for (your )?input'; then
+        log "notification skipped: waiting-status message"
+        exit 0
+    fi
     # 첫 줄만 제목으로 사용, 나머지는 summary
     FIRST_LINE="$(printf '%s' "$MSG" | head -1 | head -c 80)"
     BODY="$(build_event question "${FIRST_LINE:-Claude 질문}" "$MSG" "" "")"
