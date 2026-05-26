@@ -1,0 +1,23 @@
+# Swift build artifacts
+.build/
+*.o
+*.d
+
+# Xcode
+*.xcodeproj
+*.xcworkspace
+.DS_Store
+
+# macOS
+.DS_Store
+**/.DS_Store
+
+# LaunchAgent (personal config)
+*.plist
+
+# Logs
+*.log
+~/.claude-notifier/
+
+# Environment / secrets
+.env
