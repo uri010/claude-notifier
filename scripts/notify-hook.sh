@@ -66,17 +66,52 @@ SESSION_CACHE="/tmp/claude-notifier-allowed-${SESSION_KEY//[^a-zA-Z0-9_-]/_}"
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
-# Returns 0 (true) when the user is actively looking at a terminal window.
+# Returns 0 (true) when the user is watching the SPECIFIC tab/session where
+# this Claude Code instance is running. If the user is in a different terminal
+# tab or a different tmux session, returns 1 (show banner).
 # osascript failure → returns 1 (show banner by default).
 is_terminal_focused() {
     local frontmost
     frontmost="$(osascript -e \
         'tell application "System Events" to return name of first application process whose frontmost is true' \
         2>/dev/null)" || return 1
+
+    local frontmost_tty=""
     case "$frontmost" in
-        Terminal|터미널|iTerm2|iTerm|Alacritty|Kitty|WezTerm|Hyper) return 0 ;;
+        Terminal|터미널)
+            frontmost_tty="$(osascript -e \
+                'tell application "Terminal" to return tty of selected tab of front window' \
+                2>/dev/null)" ;;
+        iTerm2|iTerm)
+            frontmost_tty="$(osascript -e \
+                'tell application "iTerm2" to return tty of current session of current window' \
+                2>/dev/null)" ;;
+        Alacritty|Kitty|WezTerm|Hyper)
+            # Single-window terminals: if frontmost, user is watching this process.
+            return 0 ;;
         *) return 1 ;;
     esac
+
+    [ -z "$frontmost_tty" ] && return 1
+    local ft="${frontmost_tty#/dev/}"
+
+    if [ -n "$TMUX_SESSION" ]; then
+        # tmux mode: the visible tab must be a client attached to our session.
+        local tmux_path=""
+        for _p in /opt/homebrew/bin/tmux /usr/local/bin/tmux /usr/bin/tmux; do
+            [ -x "$_p" ] && tmux_path="$_p" && break
+        done
+        [ -z "$tmux_path" ] && return 0
+        while IFS= read -r client; do
+            [ "${client#/dev/}" = "$ft" ] && return 0
+        done < <("$tmux_path" list-clients -t "$TMUX_SESSION" -F "#{client_name}" 2>/dev/null)
+        return 1
+    else
+        # Non-tmux: the visible tab must be our terminal.
+        [ -n "$TERMINAL_TTY" ] || return 0
+        [ "${TERMINAL_TTY#/dev/}" = "$ft" ] && return 0
+        return 1
+    fi
 }
 
 build_event() {

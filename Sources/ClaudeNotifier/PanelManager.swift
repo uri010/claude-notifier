@@ -3,7 +3,7 @@ import AppKit
 
 /// A non-activating floating panel that hosts one banner.
 final class BannerPanel: NSPanel {
-    override var canBecomeKey: Bool { true }
+    override var canBecomeKey: Bool { false }   // never steal key-window focus
     override var canBecomeMain: Bool { false }
 }
 
@@ -118,9 +118,6 @@ final class PanelManager {
                              needsResponse: needsResponse, event: event))
         layoutPanels()
         panel.orderFrontRegardless()
-        // Make the panel key immediately so the first click fires the tap gesture directly,
-        // rather than being consumed by the "activate panel" step.
-        panel.makeKey()
         Logger.log("BANNER_SHOWN id=\(id) kind=\(event.kind.rawValue) blocking=\(needsResponse) stack=\(entries.count)")
     }
 
@@ -140,11 +137,34 @@ final class PanelManager {
             TmuxFocus.focus(session: event.tmuxSession, target: event.tmuxTarget, tty: event.tty)
         }
 
+        if decision == .allowSession, let tool = event.tool, !tool.isEmpty {
+            writeSessionCache(tool: tool, tmuxSession: event.tmuxSession)
+        }
+
         if needsResponse {
             NotificationStore.shared.resolve(id: id, decision: decision)
             NotificationStore.shared.remove(id: id)
         }
         removeBanner(id: id)
+    }
+
+    // MARK: - Session Cache
+
+    private func writeSessionCache(tool: String, tmuxSession: String?) {
+        let key = (tmuxSession?.isEmpty == false ? tmuxSession! : "global")
+            .filter { $0.isLetter || $0.isNumber || $0 == "-" || $0 == "_" }
+        let path = "/tmp/claude-notifier-allowed-\(key)"
+        let line = tool + "\n"
+        guard let data = line.data(using: .utf8) else { return }
+        if FileManager.default.fileExists(atPath: path),
+           let handle = FileHandle(forWritingAtPath: path) {
+            handle.seekToEndOfFile()
+            handle.write(data)
+            try? handle.close()
+        } else {
+            try? data.write(to: URL(fileURLWithPath: path))
+        }
+        Logger.log("SESSION_CACHE written tool=\(tool) key=\(key)")
     }
 
     // MARK: - Remove / Clear
