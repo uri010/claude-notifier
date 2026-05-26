@@ -7,6 +7,13 @@ final class BannerPanel: NSPanel {
     override var canBecomeMain: Bool { false }
 }
 
+/// NSHostingView that accepts the first mouse click without requiring prior key-window activation.
+/// Without this, clicking a non-key panel consumes the first click for activation,
+/// requiring a second click to trigger SwiftUI tap gestures.
+private final class FirstMouseHostingView<Content: View>: NSHostingView<Content> {
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+}
+
 /// Manages the stack of banner panels in the top-right of the main screen.
 @MainActor
 final class PanelManager {
@@ -81,7 +88,7 @@ final class PanelManager {
     }
 
     private func _show(id: String, event: EventRequest, needsResponse: Bool) {
-        let host = NSHostingView(rootView: BannerView(id: id, event: event) { [weak self] bid, decision in
+        let host = FirstMouseHostingView(rootView: BannerView(id: id, event: event) { [weak self] bid, decision in
             self?.handleDecision(id: bid, decision: decision, event: event, needsResponse: needsResponse)
         })
         host.layout()
@@ -111,6 +118,9 @@ final class PanelManager {
                              needsResponse: needsResponse, event: event))
         layoutPanels()
         panel.orderFrontRegardless()
+        // Make the panel key immediately so the first click fires the tap gesture directly,
+        // rather than being consumed by the "activate panel" step.
+        panel.makeKey()
         Logger.log("BANNER_SHOWN id=\(id) kind=\(event.kind.rawValue) blocking=\(needsResponse) stack=\(entries.count)")
     }
 
