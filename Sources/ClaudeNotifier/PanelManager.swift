@@ -74,6 +74,7 @@ final class PanelManager {
     private let stackOffsetY: CGFloat = 6
     private let stackOffsetX: CGFloat = 2
     private let maxVisibleDepth: Int  = 4
+    private let maxBanners: Int       = 20
 
     // MARK: - Show
 
@@ -88,6 +89,14 @@ final class PanelManager {
     }
 
     private func _show(id: String, event: EventRequest, needsResponse: Bool) {
+        guard entries.count < maxBanners else {
+            Logger.log("BANNER_LIMIT_REACHED count=\(entries.count) id=\(id) — dropped")
+            if needsResponse {
+                NotificationStore.shared.resolve(id: id, decision: .dismiss)
+                NotificationStore.shared.remove(id: id)
+            }
+            return
+        }
         let host = FirstMouseHostingView(rootView: BannerView(id: id, event: event) { [weak self] bid, decision in
             self?.handleDecision(id: bid, decision: decision, event: event, needsResponse: needsResponse)
         })
@@ -137,34 +146,11 @@ final class PanelManager {
             TmuxFocus.focus(session: event.tmuxSession, target: event.tmuxTarget, tty: event.tty)
         }
 
-        if decision == .allowSession, let tool = event.tool, !tool.isEmpty {
-            writeSessionCache(tool: tool, tmuxSession: event.tmuxSession)
-        }
-
         if needsResponse {
             NotificationStore.shared.resolve(id: id, decision: decision)
             NotificationStore.shared.remove(id: id)
         }
         removeBanner(id: id)
-    }
-
-    // MARK: - Session Cache
-
-    private func writeSessionCache(tool: String, tmuxSession: String?) {
-        let key = (tmuxSession?.isEmpty == false ? tmuxSession! : "global")
-            .filter { $0.isLetter || $0.isNumber || $0 == "-" || $0 == "_" }
-        let path = "/tmp/claude-notifier-allowed-\(key)"
-        let line = tool + "\n"
-        guard let data = line.data(using: .utf8) else { return }
-        if FileManager.default.fileExists(atPath: path),
-           let handle = FileHandle(forWritingAtPath: path) {
-            handle.seekToEndOfFile()
-            handle.write(data)
-            try? handle.close()
-        } else {
-            try? data.write(to: URL(fileURLWithPath: path))
-        }
-        Logger.log("SESSION_CACHE written tool=\(tool) key=\(key)")
     }
 
     // MARK: - Remove / Clear

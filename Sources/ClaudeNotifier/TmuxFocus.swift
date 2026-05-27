@@ -106,6 +106,12 @@ enum TmuxFocus {
     }
 
     private static func focusByTTY(_ dev: String) -> Bool {
+        // Reject any TTY path that contains characters outside the expected set
+        // to prevent AppleScript injection via a crafted tty field in the event payload.
+        guard dev.range(of: #"^/dev/[a-zA-Z0-9/]+$"#, options: .regularExpression) != nil else {
+            Logger.log("TMUX_FOCUS tty_focus rejected invalid tty=\(dev)")
+            return false
+        }
         // Find the tab first, then activate — so the right window comes to front.
         // Calling activate before set-index can raise the wrong window.
         // Returns non-zero exit if no tab matches, so the caller can detect failure.
@@ -126,7 +132,7 @@ tell application "Terminal"
     if found then
         activate
     else
-        error "tty not found: \(dev)" number 1
+        error "tty not found" number 1
     end if
 end tell
 """
