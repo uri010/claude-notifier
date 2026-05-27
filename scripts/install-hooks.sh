@@ -22,7 +22,7 @@ else
     HOOK="$HOOK_ABS"   # fallback: use absolute path if outside $HOME
 fi
 
-MATCHER="Bash|Write|Edit|MultiEdit|NotebookEdit"
+MATCHER="Bash|Write|Edit|MultiEdit|NotebookEdit|AskUserQuestion"
 [ "${1:-}" = "--all" ] && MATCHER="*"
 
 [ -f "$SETTINGS" ] || echo '{}' > "$SETTINGS"

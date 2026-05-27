@@ -173,6 +173,19 @@ case "$HOOK_TYPE" in
   pretooluse)
     TOOL_NAME="$(field '.tool_name')"
 
+    # 0. AskUserQuestion: user must respond in terminal — show notification banner only,
+    #    never output a permissionDecision (Claude Code must display its own UI).
+    if [ "$TOOL_NAME" = "AskUserQuestion" ]; then
+        if ! is_terminal_focused; then
+            Q="$(printf '%s' "$INPUT" | jq -r '.tool_input.question // empty' 2>/dev/null | head -c 200)"
+            if [ -n "$Q" ]; then
+                BODY="$(build_event question "Claude 질문" "$Q" "" "AskUserQuestion")"
+                post_notify "$BODY" >/dev/null 2>&1
+            fi
+        fi
+        exit 0
+    fi
+
     # 1. Bypass mode → explicit allow so Claude Code skips its own prompt too
     if [ "$BYPASS_ON" = "true" ]; then
         jq -n '{hookSpecificOutput:{hookEventName:"PreToolUse",
