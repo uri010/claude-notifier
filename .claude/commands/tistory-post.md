@@ -178,33 +178,35 @@ def main():
         # ── 완료(발행 레이어 열기) ───────────────────────────────────
         page.locator("#publish-layer-btn").click(); time.sleep(2)
 
-        # ── 공개 설정 (#open20 = 공개) ──────────────────────────────
+        # ── 공개 설정: JS로 radio 강제 체크 (label은 visibility hidden이라 클릭 불가) ──
         page.evaluate("""() => {
-            const el = document.getElementById('open20');
-            if (el) { el.checked = true;
+            const inp = document.getElementById('open20');
+            const lbl = document.querySelector("label[for='open20']");
+            if (inp) {
+                if (lbl) lbl.click();
+                inp.checked = true;
                 ['change','click'].forEach(e =>
-                    el.dispatchEvent(new Event(e, {bubbles:true}))); }
-            const lbl = document.querySelector('label[for="open20"]');
-            if (lbl) lbl.click();
+                    inp.dispatchEvent(new Event(e, {bubbles:true})));
+            }
         }""")
-        time.sleep(0.5)
+        time.sleep(1)
+        # 버튼 텍스트로 공개 전환 확인
+        assert "공개" in page.locator("#publish-btn").text_content(), "공개 설정 실패"
 
-        # ── 주제 선택 (IT/인터넷) ────────────────────────────────────
-        # 발행 레이어의 주제 드롭다운: "선택 안 함" 버튼이 주제 선택기
+        # ── 주제 선택 (공개 전환 후 disabled 해제됨) ────────────────────
         try:
-            topic_btns = page.locator(".select_btn")
-            for i in range(topic_btns.count()):
-                btn = topic_btns.nth(i)
-                if "선택 안 함" in (btn.text_content() or ""):
-                    btn.click(); time.sleep(1)
-                    # 드롭다운 항목에서 일치 항목 클릭
-                    items = page.locator(".select_list li, .layer-select li")
-                    for j in range(items.count()):
-                        item = items.nth(j)
-                        if TOPIC in (item.text_content() or ""):
-                            item.click()
-                            print(f"  주제 선택: {TOPIC}")
-                            break
+            page.wait_for_function(
+                """() => Array.from(document.querySelectorAll('.select_btn'))
+                    .some(b => b.textContent.includes('선택 안 함') && !b.disabled)""",
+                timeout=5000)
+            topic_btn = page.locator(".select_btn").filter(has_text="선택 안 함").first
+            topic_btn.click(); time.sleep(1)
+            items = page.locator(".select_list li, .layer-select li")
+            for j in range(items.count()):
+                item = items.nth(j)
+                if TOPIC in (item.text_content() or ""):
+                    item.click()
+                    print(f"  주제 선택: {TOPIC}")
                     break
         except Exception as e:
             print(f"  주제 선택 실패 (수동 설정): {e}")
@@ -214,7 +216,12 @@ def main():
         # ── 발행 버튼 확인 후 클릭 ───────────────────────────────────
         btn_text = page.locator("#publish-btn").text_content()
         print(f"  발행 버튼: '{btn_text}'")
-        page.locator("#publish-btn").click(); time.sleep(4)
+        page.locator("#publish-btn").click()
+        try:
+            page.wait_for_url(lambda u: "newpost" not in u, timeout=6000)
+        except Exception:
+            pass
+        time.sleep(2)
 
         print(f"📌 URL: {page.url}")
         page.screenshot(path="/tmp/tistory_post_result.png")
@@ -270,6 +277,7 @@ rm ~/.tistory_session.json
 | 이미지 업로드 405 | 잘못된 엔드포인트 | `/manage/post/attach.json` 사용 |
 | 이미지 URL 만료 걱정 | `expires` 파라미터 | Tistory CDN이 자체 서빙 → 만료 무관 |
 | 카테고리 미지정 | 자동 감지 어려움 | 발행 후 관리 페이지에서 수동 설정 |
+| 주제 선택 안 됨 | 공개 전환 후에도 `.select_btn` disabled 유지 | `wait_for_function`으로 활성화 대기; 그래도 안 되면 수동 설정 |
 
 ---
 
