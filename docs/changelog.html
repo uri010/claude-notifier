@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ClaudeNotifier — 변경 이력</title>
+  <style>
+    :root {
+      --bg: #f5f5f7;
+      --surface: #ffffff;
+      --surface2: #f0f0f5;
+      --border: #d2d2d7;
+      --text: #1d1d1f;
+      --text2: #6e6e73;
+      --accent: #0071e3;
+      --green: #34c759;
+      --orange: #ff9f0a;
+      --red: #ff3b30;
+      --radius: 18px;
+      --radius-sm: 10px;
+      --shadow: 0 4px 24px rgba(0,0,0,.10);
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #000000;
+        --surface: #1c1c1e;
+        --surface2: #2c2c2e;
+        --border: #3a3a3c;
+        --text: #f5f5f7;
+        --text2: #98989d;
+        --shadow: 0 4px 24px rgba(0,0,0,.4);
+      }
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.7;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ── Header ── */
+    header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 20px 40px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    header .logo { font-size: 15px; font-weight: 700; color: var(--text); text-decoration: none; }
+    header nav { display: flex; gap: 20px; }
+    header nav a { font-size: 13px; color: var(--accent); text-decoration: none; }
+    header nav a:hover { text-decoration: underline; }
+
+    /* ── Main ── */
+    main {
+      max-width: 760px;
+      margin: 0 auto;
+      padding: 56px 24px 80px;
+    }
+
+    h1 {
+      font-size: 32px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      margin-bottom: 8px;
+    }
+    .subtitle {
+      font-size: 15px;
+      color: var(--text2);
+      margin-bottom: 48px;
+    }
+
+    /* ── Release block ── */
+    .release {
+      margin-bottom: 48px;
+    }
+    .release-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+    .release-version {
+      font-size: 20px;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+    }
+    .release-date {
+      font-size: 13px;
+      color: var(--text2);
+    }
+    .release-tag {
+      font-size: 11px;
+      font-weight: 600;
+      padding: 3px 9px;
+      border-radius: 100px;
+    }
+    .tag-initial { background: rgba(0,113,227,.12); color: var(--accent); }
+    .tag-fix     { background: rgba(255,59,48,.12);  color: var(--red); }
+    .tag-feat    { background: rgba(52,199,89,.12);  color: var(--green); }
+    .tag-docs    { background: rgba(255,159,10,.12); color: var(--orange); }
+
+    /* ── Entry list ── */
+    .entries {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .entry {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 16px 20px;
+    }
+    .entry-top {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+    }
+    .entry-badge {
+      flex-shrink: 0;
+      font-size: 11px;
+      font-weight: 600;
+      padding: 2px 8px;
+      border-radius: 100px;
+      margin-top: 2px;
+    }
+    .badge-fix  { background: rgba(255,59,48,.12);  color: var(--red); }
+    .badge-feat { background: rgba(52,199,89,.12);  color: var(--green); }
+    .badge-docs { background: rgba(255,159,10,.12); color: var(--orange); }
+    .badge-init { background: rgba(0,113,227,.12);  color: var(--accent); }
+
+    .entry-title {
+      font-size: 15px;
+      font-weight: 600;
+      line-height: 1.4;
+    }
+    .entry-desc {
+      font-size: 14px;
+      color: var(--text2);
+      margin-top: 6px;
+      line-height: 1.6;
+    }
+    .entry-hash {
+      font-size: 11px;
+      font-family: "SF Mono", "Fira Code", monospace;
+      color: var(--text2);
+      margin-top: 8px;
+    }
+
+    /* ── Divider ── */
+    .divider {
+      border: none;
+      border-top: 1px solid var(--border);
+      margin: 48px 0;
+    }
+
+    /* ── Footer ── */
+    footer {
+      text-align: center;
+      padding: 40px 24px;
+      color: var(--text2);
+      font-size: 13px;
+      border-top: 1px solid var(--border);
+    }
+    footer a { color: var(--accent); text-decoration: none; }
+  </style>
+</head>
+<body>
+
+<header>
+  <a class="logo" href="index.html">ClaudeNotifier</a>
+  <nav>
+    <a href="index.html">홈</a>
+    <a href="guide.html">가이드</a>
+    <a href="https://github.com/uri010/claude-notifier">GitHub</a>
+  </nav>
+</header>
+
+<main>
+  <h1>변경 이력</h1>
+  <p class="subtitle">커밋 단위 수정·개선 내역을 최신순으로 정리합니다.</p>
+
+  <!-- 2026-05-27 -->
+  <div class="release">
+    <div class="release-header">
+      <span class="release-version">2026-05-27</span>
+      <span class="release-date">최신</span>
+    </div>
+    <div class="entries">
+
+      <div class="entry">
+        <div class="entry-top">
+          <span class="entry-badge badge-fix">fix</span>
+          <span class="entry-title">보안 취약점 및 버그 3건 수정</span>
+        </div>
+        <p class="entry-desc">
+          ① <strong>AppleScript injection 방어</strong> — HTTP 페이로드의 <code>tty</code> 필드가 검증 없이 AppleScript 문자열에 삽입돼 임의 명령 실행이 가능하던 문제. <code>focusByTTY()</code> 진입 전 <code>/dev/[a-zA-Z0-9/]+</code> 정규식으로 TTY 경로를 검증하도록 수정.<br>
+          ② <strong>allowSession 이중 캐시 기록 제거</strong> — "Session" 클릭 시 Swift 앱과 bash 훅 스크립트가 동시에 세션 캐시를 기록하던 문제. Swift 측 <code>writeSessionCache</code> 코드를 제거하고 bash 훅이 단독으로 처리하도록 정리.<br>
+          ③ <strong>배너 상한 초과 시 NotificationStore 메모리 누수</strong> — 배너가 20개 한도로 드롭될 때 <code>resolve</code>만 호출하고 <code>remove</code>를 누락해 <code>pending</code>·<code>events</code> 항목이 앱 재시작 전까지 남던 문제. <code>resolve + remove</code> 쌍으로 처리하도록 수정.
+        </p>
+        <div class="entry-hash">daf0367</div>
+      </div>
+
+    </div>
+  </div>
+
+  <hr class="divider">
+
+  <!-- 2026-05-26 후반 -->
+  <div class="release">
+    <div class="release-header">
+      <span class="release-version">2026-05-26</span>
+    </div>
+    <div class="entries">
+
+      <div class="entry">
+        <div class="entry-top">
+          <span class="entry-badge badge-fix">fix</span>
+          <span class="entry-title">훅 경로를 $HOME 기준 상대 경로로 변경</span>
+        </div>
+        <p class="entry-desc">
+          settings.json에 하드코딩된 절대 경로가 장비마다 달라지는 문제.
+          <code>$HOME/...</code> 형태로 기록해 다른 장비에서 클론 후
+          <code>install-hooks.sh</code>만 다시 실행하면 동작하도록 수정.
+        </p>
+        <div class="entry-hash">c1d5993</div>
+      </div>
+
+      <div class="entry">
+        <div class="entry-top">
+          <span class="entry-badge badge-docs">docs</span>
+          <span class="entry-title">배너 스크린샷 이미지 모서리 둥글게 처리</span>
+        </div>
+        <p class="entry-desc">
+          <code>&lt;img&gt;</code>에 <code>padding</code>을 주면
+          <code>border-radius</code>가 이미지 픽셀이 아닌 바깥 박스에만 적용되는 문제.
+          <code>margin</code> + <code>width: calc(100% - 48px)</code>로 변경해 실제 이미지 모서리가 둥글게 렌더링되도록 수정.
+        </p>
+        <div class="entry-hash">7040530</div>
+      </div>
+
+      <div class="entry">
+        <div class="entry-top">
+          <span class="entry-badge badge-fix">fix</span>
+          <span class="entry-title">tmux 포커스 정확도 · 탭 감지 · allowSession 캐시 개선</span>
+        </div>
+        <p class="entry-desc">
+          ① tmux에서 <code>display-message</code>가 현재 클라이언트 기준이라 실제 pane과 다른 위치로 이동하던 문제 → pane TTY 역조회 방식으로 교체.<br>
+          ② 터미널 포커스 감지 시 탭 전환 없이 창만 활성화되던 문제 → 탭 먼저 찾은 뒤 activate 순서로 수정.<br>
+          ③ allowSession 클릭이 훅 타임아웃 후에도 다음 요청부터 반영되지 않던 문제 → 앱이 직접 세션 캐시를 기록하도록 변경.
+        </p>
+        <div class="entry-hash">2535fb5</div>
+      </div>
+
+      <div class="entry">
+        <div class="entry-top">
+          <span class="entry-badge badge-fix">fix</span>
+          <span class="entry-title">배너 첫 클릭이 창 활성화에 소모되는 문제</span>
+        </div>
+        <p class="entry-desc">
+          배너를 처음 클릭할 때 한 번은 창 활성화에 쓰여 버튼이 반응하지 않던 문제.
+          패널을 표시할 때 미리 key window로 지정하고 <code>acceptsFirstMouse</code>를 재정의해 첫 클릭부터 바로 동작하도록 수정.
+        </p>
+        <div class="entry-hash">0597561</div>
+      </div>
+
+      <div class="entry">
+        <div class="entry-top">
+          <span class="entry-badge badge-docs">docs</span>
+          <span class="entry-title">스크린샷 이미지를 base64로 임베드</span>
+        </div>
+        <p class="entry-desc">
+          외부 이미지 파일 의존 없이 HTML 단일 파일로 공유 가능하도록
+          스크린샷을 base64 인라인 데이터로 변환.
+        </p>
+        <div class="entry-hash">7615f5f</div>
+      </div>
+
+      <div class="entry">
+        <div class="entry-top">
+          <span class="entry-badge badge-fix">fix</span>
+          <span class="entry-title">'Claude is waiting' 알림이 배너로 표시되는 문제</span>
+        </div>
+        <p class="entry-desc">
+          Claude Code가 대기 상태임을 알리는 단순 상태 메시지가 배너로 뜨던 문제.
+          메시지 내용을 검사해 "Claude is waiting" / "waiting for input" 패턴을 필터링.
+        </p>
+        <div class="entry-hash">8eaf9ca</div>
+      </div>
+
+      <div class="entry">
+        <div class="entry-top">
+          <span class="entry-badge badge-fix">fix</span>
+          <span class="entry-title">한국어 로케일 Terminal 앱 이름 미감지</span>
+        </div>
+        <p class="entry-desc">
+          macOS 한국어 설정에서 Terminal이 '터미널'로 표시돼 자동 소멸이 동작하지 않던 문제.
+          앱 이름 목록에 '터미널' 추가, NSWorkspace 알림 불안정 문제도 RunLoop 폴링 타이머로 교체.
+        </p>
+        <div class="entry-hash">143a6ec</div>
+      </div>
+
+      <div class="entry">
+        <div class="entry-top">
+          <span class="entry-badge badge-feat">feat</span>
+          <span class="entry-title">터미널 포커스 시 배너 자동 소멸</span>
+        </div>
+        <p class="entry-desc">
+          터미널 앱(Terminal, iTerm2, Alacritty 등)이 최전면으로 오면
+          표시 중인 배너를 자동으로 닫는 기능 추가.
+        </p>
+        <div class="entry-hash">0f596b6</div>
+      </div>
+
+      <div class="entry">
+        <div class="entry-top">
+          <span class="entry-badge badge-docs">docs</span>
+          <span class="entry-title">HTML 랜딩 페이지 · 상세 가이드 추가</span>
+        </div>
+        <p class="entry-desc">
+          <code>docs/index.html</code> (프로젝트 소개 페이지)와
+          <code>docs/guide.html</code> (훅 설정, API, LaunchAgent, 트러블슈팅 가이드) 최초 작성.
+        </p>
+        <div class="entry-hash">98a6cd1</div>
+      </div>
+
+    </div>
+  </div>
+
+  <hr class="divider">
+
+  <!-- Initial release -->
+  <div class="release">
+    <div class="release-header">
+      <span class="release-version">초기 릴리스</span>
+      <span class="release-tag tag-initial">v1.0</span>
+      <span class="release-date">2026-05-26</span>
+    </div>
+    <div class="entries">
+      <div class="entry">
+        <div class="entry-top">
+          <span class="entry-badge badge-init">init</span>
+          <span class="entry-title">Claude Code 배너 알림 시스템 첫 릴리스</span>
+        </div>
+        <p class="entry-desc">
+          SwiftUI NSPanel 앱 + bash 훅 디스패처로 구성된 기본 구조.
+          권한 요청 · 작업 완료 · 질문 배너, TTY 기반 터미널 포커스 감지,
+          세션 레벨 allow 캐시, fail-open 안전 설계 포함.
+        </p>
+        <div class="entry-hash">090ba81</div>
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<footer>
+  <p>ClaudeNotifier · <a href="https://github.com/uri010/claude-notifier">GitHub</a></p>
+</footer>
+
+</body>
+</html>
