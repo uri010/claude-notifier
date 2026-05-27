@@ -173,18 +173,40 @@ case "$HOOK_TYPE" in
   pretooluse)
     TOOL_NAME="$(field '.tool_name')"
 
-    # 1. Bypass mode → nothing to do
+    # 1. Bypass mode → explicit allow so Claude Code skips its own prompt too
     if [ "$BYPASS_ON" = "true" ]; then
+        jq -n '{hookSpecificOutput:{hookEventName:"PreToolUse",
+          permissionDecision:"allow",
+          permissionDecisionReason:"dangerouslySkipPermissions active"}}'
         exit 0
     fi
 
-    # 2. Session cache → already allowed this tool for the session
+    # 2. Session cache → explicit allow so Claude Code skips its own prompt too.
+    #    Exception: destructive Bash commands always require confirmation even when
+    #    Bash is session-cached — "allow session" for ls must not silently allow rm.
     if [ -f "$SESSION_CACHE" ] && grep -qxF "$TOOL_NAME" "$SESSION_CACHE" 2>/dev/null; then
-        log "session-cached allow for $TOOL_NAME"
-        exit 0
+        _is_destructive=false
+        if [ "$TOOL_NAME" = "Bash" ]; then
+            _cmd="$(printf '%s' "$INPUT" | jq -r '.tool_input.command // ""' 2>/dev/null)"
+            # Match the first word (or sudo + first word) against a destructive list.
+            if printf '%s' "$_cmd" | grep -qE \
+               '(^|;|&&|\|\|)[[:space:]]*(sudo[[:space:]]+)?(rm|rmdir|shred|unlink|dd\b|mkfs|fdisk|diskutil[[:space:]]+erase)'; then
+                _is_destructive=true
+                log "session-cache bypass: destructive bash command — $( printf '%s' "$_cmd" | head -c 80)"
+            fi
+        fi
+        if [ "$_is_destructive" = "false" ]; then
+            log "session-cached allow for $TOOL_NAME"
+            jq -n '{hookSpecificOutput:{hookEventName:"PreToolUse",
+              permissionDecision:"allow",
+              permissionDecisionReason:"Session-cached allow"}}'
+            exit 0
+        fi
+        unset _cmd _is_destructive
     fi
 
-    # 3. Terminal focused → user is watching, let Claude show its own prompt
+    # 3. Terminal focused → exit 0 without JSON so Claude Code shows its own prompt
+    #    (user is watching the terminal, so the native UI is appropriate)
     if is_terminal_focused; then
         log "terminal focused, skipping banner for $TOOL_NAME"
         exit 0

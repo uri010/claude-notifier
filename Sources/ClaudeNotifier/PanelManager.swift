@@ -143,6 +143,13 @@ final class PanelManager {
 
         if decision == .focus {
             TmuxFocus.focus(session: event.tmuxSession, target: event.tmuxTarget, tty: event.tty)
+            if needsResponse {
+                // Permission banner body tap: focus the terminal but keep the banner
+                // visible so the user can still click Yes / Session / No.
+                // Sending .focus to the hook would cause fail-open (exit 0 without JSON).
+                Logger.log("FOCUS_ONLY id=\(id) — permission banner kept for pending decision")
+                return
+            }
         }
 
         if needsResponse {

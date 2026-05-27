@@ -198,6 +198,52 @@
       <div class="entry">
         <div class="entry-top">
           <span class="entry-badge badge-fix">fix</span>
+          <span class="entry-title">권한 배너 본문 클릭이 fail-open(자동 허용)으로 이어지는 버그</span>
+        </div>
+        <p class="entry-desc">
+          권한 배너의 버튼이 아닌 본문 영역을 클릭하면 <code>.focus</code> 결정이
+          훅 스크립트에 전달되고, 훅의 <code>case</code>문에서 <code>*</code> 케이스로
+          분기해 <code>exit 0</code>(JSON 없음)이 됩니다. Claude Code는 이를 훅 무결정으로
+          해석해 자체 터미널 권한 프롬프트를 표시했습니다.<br>
+          <code>PanelManager.handleDecision()</code>에서 권한 배너(<code>needsResponse=true</code>)의
+          <code>.focus</code> 결정은 터미널 포커스만 수행하고 즉시 반환해
+          배너가 유지되도록 수정. 사용자는 Yes/Session/No 버튼으로만 결정을 전달할 수 있습니다.
+        </p>
+      </div>
+
+      <div class="entry">
+        <div class="entry-top">
+          <span class="entry-badge badge-fix">fix</span>
+          <span class="entry-title">세션 캐시·bypass 경로에서 Claude Code 자체 권한 프롬프트가 뜨는 버그</span>
+        </div>
+        <p class="entry-desc">
+          세션 캐시 hit 또는 <code>--dangerouslySkipPermissions</code> 경로에서
+          훅 스크립트가 <code>permissionDecision</code> JSON 없이 <code>exit 0</code>만 반환했습니다.
+          Claude Code는 이를 "훅이 결정하지 않음"으로 해석해 터미널에 자체 권한 확인(빨간 ◉)을
+          표시했습니다.<br>
+          두 경로 모두 <code>permissionDecision:"allow"</code> JSON을 출력하도록 수정.
+        </p>
+      </div>
+
+      <div class="entry">
+        <div class="entry-top">
+          <span class="entry-badge badge-fix">fix</span>
+          <span class="entry-title">Bash 세션 허용 후 rm 등 위험 명령이 무조건 통과되는 보안 문제</span>
+        </div>
+        <p class="entry-desc">
+          <code>ls</code> 같은 안전한 명령에 "Session 허용"을 클릭하면 세션 캐시에
+          <code>Bash</code>가 등록되어 이후 모든 Bash 명령이 배너 없이 허용되었습니다.
+          <code>rm -rf</code>, <code>sudo rm</code>, <code>rmdir</code>,
+          <code>shred</code>, <code>unlink</code>, <code>dd</code>,
+          <code>mkfs</code>, <code>fdisk</code>, <code>diskutil erase</code>
+          및 파이프라인(<code>; rm</code>, <code>&amp;&amp; rm</code> 등) 패턴을
+          탐지해 세션 캐시를 무시하고 항상 배너로 권한을 확인하도록 수정.
+        </p>
+      </div>
+
+      <div class="entry">
+        <div class="entry-top">
+          <span class="entry-badge badge-fix">fix</span>
           <span class="entry-title">tmux 같은 세션 다른 창에서 배너가 표시되지 않는 문제</span>
         </div>
         <p class="entry-desc">
