@@ -21,3 +21,6 @@
 
 # Environment / secrets
 .env
+
+# Claude Code local settings (personal permissions, not project config)
+.claude/settings.local.json

@@ -242,7 +242,10 @@ case "$HOOK_TYPE" in
 
 # ── Stop (task complete) ──────────────────────────────────────────────────────
   stop)
-    is_terminal_focused && exit 0   # 터미널 보고 있으면 배너 불필요
+    if is_terminal_focused; then
+        log "terminal focused, skipping stop banner"
+        exit 0
+    fi
     MSG="$(field '.message' | head -c 200)"
     [ -z "$MSG" ] && MSG="프롬프트 처리가 완료되었습니다."
     BODY="$(build_event stop "작업 완료" "$MSG" "" "")"
@@ -252,7 +255,10 @@ case "$HOOK_TYPE" in
 
 # ── Notification (Claude question / status) ───────────────────────────────────
   notification)
-    is_terminal_focused && exit 0   # 터미널 보고 있으면 배너 불필요
+    if is_terminal_focused; then
+        log "terminal focused, skipping notification banner"
+        exit 0
+    fi
     MSG="$(field '.message' | head -c 300)"
     [ -z "$MSG" ] && exit 0   # 빈 메시지는 무시
     log "notification msg=$(printf '%s' "$MSG" | head -1 | head -c 120)"
