@@ -268,7 +268,7 @@
       <tbody>
         <tr><td><strong>Fail-open</strong></td><td>앱 미실행 / 타임아웃 시 Claude Code 기본 동작으로 폴백</td></tr>
         <tr><td><strong>스마트 표시</strong></td><td>터미널이 이미 포커스 상태면 배너 생략</td></tr>
-        <tr><td><strong>터미널 포커스 시 자동 소멸</strong></td><td>터미널로 전환하면 1.5초 이내 모든 배너 자동 닫힘</td></tr>
+        <tr><td><strong>터미널 포커스 시 알림 자동 소멸</strong></td><td>터미널로 전환하면 작업완료·질문 배너가 1.5초 이내 자동 닫힘. 권한 배너는 사용자 응답 전까지 유지</td></tr>
         <tr><td><strong>알림 필터</strong></td><td>"Claude is waiting" 계열 상태 메시지는 배너 미표시</td></tr>
         <tr><td><strong>소리 없음</strong></td><td>어떤 상황에도 사운드 재생 없음</td></tr>
       </tbody>
@@ -340,16 +340,26 @@ cd claude-notifier</code></pre>
                     ↓
            POST /notify → 앱이 배너 표시 (응답 대기 없음)</code></pre>
 
-    <h3>터미널 포커스 감지</h3>
-    <p>다음 앱이 전면이면 <strong>배너를 표시하지 않습니다</strong>:</p>
-    <pre><code>Terminal, 터미널, iTerm2, iTerm, Alacritty, Kitty, WezTerm, Hyper</code></pre>
-    <p>그 외 모든 앱(브라우저, IDE, Finder 등)이 전면이면 배너를 표시합니다.</p>
+    <h3>터미널 포커스 감지 (정밀 탭·창 확인)</h3>
+    <p>단순히 터미널 앱이 전면에 있는지만 확인하지 않고, <strong>Claude Code가 실행 중인 바로 그 탭/tmux 창</strong>이 보이는지 정확히 확인합니다.</p>
+    <table>
+      <thead><tr><th>상황</th><th>결과</th></tr></thead>
+      <tbody>
+        <tr><td>터미널이 최전면 + Claude Code가 실행 중인 tmux 창이 보임</td><td>배너 생략</td></tr>
+        <tr><td>터미널이 최전면이지만 다른 탭에 있음</td><td><strong>배너 표시</strong></td></tr>
+        <tr><td>터미널이 최전면이지만 같은 tmux 세션의 다른 창 보는 중</td><td><strong>배너 표시</strong></td></tr>
+        <tr><td>터미널이 최전면이지만 다른 tmux 세션 보는 중</td><td><strong>배너 표시</strong></td></tr>
+        <tr><td>브라우저, IDE 등 다른 앱</td><td><strong>배너 표시</strong></td></tr>
+      </tbody>
+    </table>
 
     <h3>터미널 포커스 시 배너 자동 소멸</h3>
-    <p>앱은 1.5초 간격으로 최전면 앱을 폴링합니다. 터미널로 전환하는 순간을 감지해 모든 배너를 자동으로 닫습니다.</p>
-    <pre><code>[카카오톡 사용 중] → 배너 표시
+    <p>앱은 1.5초 간격으로 최전면 앱을 폴링합니다. 터미널로 전환하는 순간을 감지해 <strong>알림성 배너(작업완료·질문)만</strong> 자동으로 닫습니다.</p>
+    <p><strong>권한 요청 배너는 자동으로 닫히지 않습니다</strong> — 터미널로 이동해도 사용자가 명시적으로 Yes/No를 선택할 때까지 유지됩니다.</p>
+    <pre><code>[카카오톡 사용 중] → 작업완료·질문 배너 표시
        ↓ 터미널로 전환
-[터미널 감지] → clearAll() → 배너 자동 소멸 (최대 1.5초 이내)</code></pre>
+[터미널 감지] → clearInfoBanners() → 알림 배너 소멸 (최대 1.5초 이내)
+               권한 배너는 그대로 유지 → 사용자 클릭 대기</code></pre>
 
     <h3>Notification 알림 필터</h3>
     <p>Claude Code가 유휴 상태에서 보내는 "Claude is waiting for your input" 계열 메시지는 배너를 표시하지 않고 무시합니다.</p>

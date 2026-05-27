@@ -53,7 +53,7 @@ for _ti in 1 2 3 4 5 6 7 8 9 10; do
         TERMINAL_TTY="$_tt"; break
     fi
     _tpp="$(ps -p "$_tp" -o ppid= 2>/dev/null | tr -d ' ' || true)"
-    [ -z "$_tpp" ] || [ "$_tpp" = "1" ] || [ "$_tpp" = "$_tp" ] && break
+    if [ -z "$_tpp" ] || [ "$_tpp" = "0" ] || [ "$_tpp" = "1" ] || [ "$_tpp" = "$_tp" ]; then break; fi
     _tp="$_tpp"
 done
 unset _tp _tpp _tt _ti
@@ -96,19 +96,32 @@ is_terminal_focused() {
     local ft="${frontmost_tty#/dev/}"
 
     if [ -n "$TMUX_SESSION" ]; then
-        # tmux mode: the visible tab must be a client attached to our session.
+        # tmux mode: the visible tab must be a client attached to our session AND
+        # must currently be viewing the same window+pane where this hook is running.
+        # Without the window check, any pane in the session would suppress banners
+        # from every other pane in the same session.
         local tmux_path=""
         for _p in /opt/homebrew/bin/tmux /usr/local/bin/tmux /usr/bin/tmux; do
             [ -x "$_p" ] && tmux_path="$_p" && break
         done
         [ -z "$tmux_path" ] && return 0
+        # Parse our own window and pane index from TMUX_TARGET (e.g. "SON:4.0").
+        local our_win our_pane
+        our_win="${TMUX_TARGET#*:}"; our_win="${our_win%%.*}"   # "4"
+        our_pane="${TMUX_TARGET##*.}"                           # "0"
         while IFS= read -r client; do
-            [ "${client#/dev/}" = "$ft" ] && return 0
+            if [ "${client#/dev/}" = "$ft" ]; then
+                # TTY matches — now check which window+pane this client is viewing.
+                local cli_win cli_pane
+                cli_win="$(  "$tmux_path" display-message -c "$client" -p '#I' 2>/dev/null || true)"
+                cli_pane="$( "$tmux_path" display-message -c "$client" -p '#P' 2>/dev/null || true)"
+                [ "$cli_win" = "$our_win" ] && [ "$cli_pane" = "$our_pane" ] && return 0
+            fi
         done < <("$tmux_path" list-clients -t "$TMUX_SESSION" -F "#{client_name}" 2>/dev/null)
         return 1
     else
         # Non-tmux: the visible tab must be our terminal.
-        [ -n "$TERMINAL_TTY" ] || return 0
+        [ -n "$TERMINAL_TTY" ] || return 1
         [ "${TERMINAL_TTY#/dev/}" = "$ft" ] && return 0
         return 1
     fi
@@ -148,7 +161,7 @@ for _i in 1 2 3 4 5 6 7 8 9 10; do
         BYPASS_ON="true"; break
     fi
     _pp="$(ps -p "$_p" -o ppid= 2>/dev/null | tr -d ' ' || true)"
-    [ -z "$_pp" ] || [ "$_pp" = "1" ] || [ "$_pp" = "$_p" ] && break
+    if [ -z "$_pp" ] || [ "$_pp" = "0" ] || [ "$_pp" = "1" ] || [ "$_pp" = "$_p" ]; then break; fi
     _p="$_pp"
 done
 unset _p _pp _a _i

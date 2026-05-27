@@ -71,6 +71,7 @@ enum TmuxFocus {
         let proc = Process()
         proc.executableURL = URL(fileURLWithPath: path)
         proc.arguments = args
+        proc.standardOutput = Pipe()
         proc.standardError = Pipe()
         do { try proc.run(); proc.waitUntilExit() } catch {}
         Logger.log("TMUX_RUN \(args.joined(separator: " ")) status=\(proc.terminationStatus)")

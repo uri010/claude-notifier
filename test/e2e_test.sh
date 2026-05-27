@@ -93,7 +93,7 @@ for _i in 1 2 3 4 5 6 7 8 9 10; do
     _tt="$(ps -p "$_p" -o tty= 2>/dev/null | tr -d ' ')"
     if [ -n "$_tt" ] && [ "$_tt" != "??" ]; then TERM_TTY="$_tt"; break; fi
     _pp="$(ps -p "$_p" -o ppid= 2>/dev/null | tr -d ' ' || true)"
-    [ -z "$_pp" ] || [ "$_pp" = "1" ] || [ "$_pp" = "$_p" ] && break
+    if [ -z "$_pp" ] || [ "$_pp" = "0" ] || [ "$_pp" = "1" ] || [ "$_pp" = "$_p" ]; then break; fi
     _p="$_pp"
 done
 unset _p _pp _tt _i

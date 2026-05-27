@@ -39,8 +39,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             let isTerminal = terminals.contains(name)
             if isTerminal && !prevWasTerminal {
                 Task { @MainActor in
-                    Logger.log("TERMINAL_FOCUSED app=\(name) — clearing banners")
-                    PanelManager.shared.clearAll()
+                    Logger.log("TERMINAL_FOCUSED app=\(name) — clearing info banners")
+                    PanelManager.shared.clearInfoBanners()
                 }
             }
             prevWasTerminal = isTerminal

@@ -9,9 +9,10 @@ enum Logger {
     }()
 
     private static let queue = DispatchQueue(label: "claude.notifier.log")
+    private static let formatter: ISO8601DateFormatter = ISO8601DateFormatter()
 
     static func log(_ message: String) {
-        let ts = ISO8601DateFormatter().string(from: Date())
+        let ts = formatter.string(from: Date())
         let line = "[\(ts)] \(message)\n"
         queue.async {
             FileHandle.standardError.write(Data(line.utf8))

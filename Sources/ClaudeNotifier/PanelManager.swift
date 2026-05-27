@@ -62,7 +62,6 @@ final class PanelManager {
     private struct Entry {
         let id: String
         let panel: BannerPanel
-        let height: CGFloat
         let needsResponse: Bool   // false for informational (stop/notify) banners
         let event: EventRequest   // kept for focus decisions on info banners
     }
@@ -123,7 +122,7 @@ final class PanelManager {
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary]
         panel.contentView = host
 
-        entries.append(Entry(id: id, panel: panel, height: height + 14,
+        entries.append(Entry(id: id, panel: panel,
                              needsResponse: needsResponse, event: event))
         layoutPanels()
         panel.orderFrontRegardless()
@@ -175,6 +174,20 @@ final class PanelManager {
         }
         entries.removeAll()
         Logger.log("BANNER_CLEAR_ALL")
+    }
+
+    /// Clears only informational (non-blocking) banners.
+    /// Called on terminal focus so that permission banners that still need a
+    /// decision are NOT auto-dismissed (which would cause failing-open = allow).
+    func clearInfoBanners() {
+        let infos = entries.filter { !$0.needsResponse }
+        for entry in infos {
+            entry.panel.orderOut(nil)
+            entry.panel.close()
+        }
+        entries.removeAll { !$0.needsResponse }
+        if !infos.isEmpty { layoutPanels() }
+        Logger.log("BANNER_CLEAR_INFO count=\(infos.count)")
     }
 
     // MARK: - Layout (overlap stack)
