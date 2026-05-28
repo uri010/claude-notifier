@@ -214,16 +214,15 @@
       <div class="entry">
         <div class="entry-top">
           <span class="entry-badge badge-fix">fix</span>
-          <span class="entry-title">권한 배너 본문 클릭이 fail-open(자동 허용)으로 이어지는 버그</span>
+          <span class="entry-title">권한 배너 본문 클릭 후 배너가 사라지지 않는 버그</span>
         </div>
         <p class="entry-desc">
-          권한 배너의 버튼이 아닌 본문 영역을 클릭하면 <code>.focus</code> 결정이
-          훅 스크립트에 전달되고, 훅의 <code>case</code>문에서 <code>*</code> 케이스로
-          분기해 <code>exit 0</code>(JSON 없음)이 됩니다. Claude Code는 이를 훅 무결정으로
-          해석해 자체 터미널 권한 프롬프트를 표시했습니다.<br>
-          <code>PanelManager.handleDecision()</code>에서 권한 배너(<code>needsResponse=true</code>)의
-          <code>.focus</code> 결정은 터미널 포커스만 수행하고 즉시 반환해
-          배너가 유지되도록 수정. 사용자는 Yes/Session/No 버튼으로만 결정을 전달할 수 있습니다.
+          권한 배너 본문 클릭 시 터미널 포커스는 되지만 배너가 닫히지 않아
+          hook이 계속 응답을 대기하고 Claude Code도 멈춰있던 문제.<br>
+          배너 본문 클릭(<code>.focus</code> 결정)은 배너를 닫고 터미널을 포커스한 뒤
+          hook이 <code>exit 0</code>으로 종료해 Claude Code 자체 터미널 권한 프롬프트로
+          제어를 넘기도록 수정. <code>focus</code>·<code>dismiss</code> 케이스를 명시적으로
+          분리해 의도를 로그에 기록.
         </p>
       </div>
 

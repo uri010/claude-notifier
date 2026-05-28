@@ -281,6 +281,12 @@ case "$HOOK_TYPE" in
           permissionDecision:"deny",
           permissionDecisionReason:"Denied via notifier banner"}}'
         ;;
+      focus|dismiss)
+        # User clicked banner body / dismiss → banner closed, terminal focused.
+        # Pass control back to Claude Code's own permission UI (no permissionDecision output).
+        log "decision=$DECISION — deferring to Claude Code terminal UI"
+        exit 0
+        ;;
       *)
         log "no explicit decision ($DECISION), failing open"
         exit 0
