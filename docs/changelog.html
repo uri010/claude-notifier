@@ -187,11 +187,66 @@
   <h1>변경 이력</h1>
   <p class="subtitle">커밋 단위 수정·개선 내역을 최신순으로 정리합니다.</p>
 
+  <!-- 2026-05-28 -->
+  <div class="release">
+    <div class="release-header">
+      <span class="release-version">2026-05-28</span>
+      <span class="release-date">최신</span>
+    </div>
+    <div class="entries">
+
+      <div class="entry">
+        <div class="entry-top">
+          <span class="entry-badge badge-fix">fix</span>
+          <span class="entry-title">보안 취약점 3건 수정 — 로그 권한·세션 캐시 경로·파괴적 명령 감지</span>
+        </div>
+        <p class="entry-desc">
+          독립 보안 검토(Argus)에서 발견된 취약점을 수정.<br>
+          ① <strong>[CRITICAL] 로그 파일 권한 강화</strong> —
+          <code>~/.claude-notifier/</code> 디렉터리를 <code>0700</code>,
+          <code>notifier.log</code>를 <code>0600</code>으로 생성.
+          기존 파일도 앱 시작 시 자동 수정(<code>setAttributes</code>).
+          로그에 기록되는 이벤트 UUID를 앞 8자만 남겨 유출 시 악용 불가.<br>
+          ② <strong>[HIGH] 세션 캐시 경로 이동</strong> —
+          <code>/tmp/</code> 대신 <code>~/.claude-notifier/sessions/</code>(<code>0700</code>)에
+          <code>0600</code> 권한으로 저장.
+          읽기 전 소유자·권한 검증(<code>_cache_is_safe()</code>)으로
+          외부에서 사전 생성한 파일을 자동 거부.
+          기존 세션 캐시는 초기화되므로 첫 사용 시 1회 재승인 필요.<br>
+          ③ <strong>[MEDIUM] 파괴적 Bash 명령 감지 강화</strong> —
+          파이프(<code>| rm</code>), 서브셸(<code>$(rm …)</code>),
+          절대경로(<code>/bin/rm</code>), 따옴표(<code>"rm"</code>)로 우회하던 패턴을
+          <code>_is_destructive_cmd()</code>로 일괄 탐지.
+          <code>find … -delete</code>, <code>truncate</code>도 추가.
+        </p>
+        <div class="entry-hash">1b51a8c</div>
+      </div>
+
+      <div class="entry">
+        <div class="entry-top">
+          <span class="entry-badge badge-docs">docs</span>
+          <span class="entry-title">가이드 문서에 AskUserQuestion·세션 캐시 보안·버그 수정 내용 반영</span>
+        </div>
+        <p class="entry-desc">
+          <code>guide.html</code>, <code>guide.md</code>, <code>README.md</code>의
+          훅 매처에 <code>AskUserQuestion</code> 추가.
+          PreToolUse 흐름 다이어그램에 AskUserQuestion 단계 및
+          <code>focus / dismiss</code> 결정 케이스 추가.
+          세션 캐시 보안 섹션 신설(위험 명령 표 포함).
+          <code>settings.json</code> 예시 매처 업데이트.
+        </p>
+        <div class="entry-hash">16fbcff</div>
+      </div>
+
+    </div>
+  </div>
+
+  <hr class="divider">
+
   <!-- 2026-05-27 -->
   <div class="release">
     <div class="release-header">
       <span class="release-version">2026-05-27</span>
-      <span class="release-date">최신</span>
     </div>
     <div class="entries">
 
