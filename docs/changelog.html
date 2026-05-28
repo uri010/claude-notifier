@@ -198,7 +198,7 @@
       <div class="entry">
         <div class="entry-top">
           <span class="entry-badge badge-feat">feat</span>
-          <span class="entry-title">AskUserQuestion 질문 배너 지원 추가</span>
+          <span class="entry-title">AskUserQuestion 질문 배너 지원 추가 + 입력 스키마 수정</span>
         </div>
         <p class="entry-desc">
           Claude Code가 <code>AskUserQuestion</code> 도구로 사용자에게 확인을 요청할 때
@@ -207,7 +207,23 @@
           기본 hook 매처에 <code>AskUserQuestion</code>을 추가하고,
           훅 스크립트에서 이를 감지해 질문 내용을 <code>/notify</code>로 전송하도록 수정.
           배너 클릭 시 해당 터미널(tmux pane 포함)로 포커스 이동.
-          Claude Code의 자체 응답 UI는 그대로 유지됨(권한 결정 반환하지 않음).
+          Claude Code의 자체 응답 UI는 그대로 유지됨(권한 결정 반환하지 않음).<br>
+          <strong>Bug:</strong> 질문 텍스트 추출 경로를 <code>.tool_input.question</code>으로
+          잘못 설정해 항상 비어 있었던 문제 수정.
+          실제 스키마는 <code>.tool_input.questions[0].question</code>(배열 형태).
+          두 경로 모두 fallback으로 처리.
+        </p>
+      </div>
+
+      <div class="entry">
+        <div class="entry-top">
+          <span class="entry-badge badge-fix">fix</span>
+          <span class="entry-title">앱 로그 중복 기록 버그</span>
+        </div>
+        <p class="entry-desc">
+          <code>Logger.log()</code>가 파일에 직접 쓰는 동시에 <code>stderr</code>에도 출력하는데,
+          LaunchAgent가 <code>stderr</code>를 같은 파일로 리다이렉트해
+          모든 로그가 2번씩 기록되던 문제. <code>stderr</code> 출력 제거.
         </p>
       </div>
 

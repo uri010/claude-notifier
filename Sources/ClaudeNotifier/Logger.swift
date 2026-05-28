@@ -15,7 +15,8 @@ enum Logger {
         let ts = formatter.string(from: Date())
         let line = "[\(ts)] \(message)\n"
         queue.async {
-            FileHandle.standardError.write(Data(line.utf8))
+            // Write only to the log file. LaunchAgent redirects stderr to the
+            // same file, so writing to both would produce duplicate entries.
             if let h = FileHandle(forWritingAtPath: logPath) {
                 h.seekToEndOfFile()
                 h.write(Data(line.utf8))

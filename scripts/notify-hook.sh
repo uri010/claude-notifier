@@ -175,9 +175,13 @@ case "$HOOK_TYPE" in
 
     # 0. AskUserQuestion: user must respond in terminal — show notification banner only,
     #    never output a permissionDecision (Claude Code must display its own UI).
+    #    Input schema: tool_input.questions[0].question  (questions array, not single field)
     if [ "$TOOL_NAME" = "AskUserQuestion" ]; then
         if ! is_terminal_focused; then
-            Q="$(printf '%s' "$INPUT" | jq -r '.tool_input.question // empty' 2>/dev/null | head -c 200)"
+            Q="$(printf '%s' "$INPUT" | jq -r '
+                .tool_input.questions[0].question //
+                .tool_input.question //
+                empty' 2>/dev/null | head -c 200)"
             if [ -n "$Q" ]; then
                 BODY="$(build_event question "Claude 질문" "$Q" "" "AskUserQuestion")"
                 post_notify "$BODY" >/dev/null 2>&1
