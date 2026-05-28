@@ -89,7 +89,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 return jsonResponse(400, ["error": "invalid event json"])
             }
             let id = NotificationStore.shared.createPending(for: event)
-            Logger.log("EVENT_RECEIVED id=\(id) kind=\(event.kind.rawValue)")
+            Logger.log("EVENT_RECEIVED id=\(id.prefix(8))… kind=\(event.kind.rawValue)")
             return jsonResponse(200, ["id": id])
         }
 
@@ -100,7 +100,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 return jsonResponse(400, ["error": "invalid event json"])
             }
             let id = UUID().uuidString
-            Logger.log("NOTIFY_RECEIVED id=\(id) kind=\(event.kind.rawValue)")
+            Logger.log("NOTIFY_RECEIVED id=\(id.prefix(8))… kind=\(event.kind.rawValue)")
             DispatchQueue.main.async {
                 PanelManager.shared.showInfoBanner(id: id, event: event)
             }
@@ -125,7 +125,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             guard NotificationStore.shared.pendingResponse(for: id) != nil else {
                 return jsonResponse(404, ["error": "unknown id"])
             }
-            Logger.log("RESPOND_API id=\(id) decision=\(decision.rawValue)")
+            Logger.log("RESPOND_API id=\(id.prefix(8))… decision=\(decision.rawValue)")
             DispatchQueue.main.async { PanelManager.shared.applyDecision(id: id, decision: decision) }
             return jsonResponse(200, ["ok": true, "decision": decision.rawValue])
         }

@@ -61,10 +61,45 @@ unset _tp _tpp _tt _ti
 CONTEXT="session: ${TMUX_SESSION:-${SESSION_ID:-local}} | ${FOLDER}"
 
 # Session cache: one allowed tool name per line
+# Stored under ~/.claude-notifier/sessions/ (0700) to prevent /tmp poisoning.
 SESSION_KEY="${TMUX_SESSION:-${SESSION_ID:-global}}"
-SESSION_CACHE="/tmp/claude-notifier-allowed-${SESSION_KEY//[^a-zA-Z0-9_-]/_}"
+SESSION_DIR="$HOME/.claude-notifier/sessions"
+SESSION_CACHE="${SESSION_DIR}/allowed-${SESSION_KEY//[^a-zA-Z0-9_-]/_}"
+[ -d "$SESSION_DIR" ] || mkdir -m 0700 -p "$SESSION_DIR" 2>/dev/null
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
+
+# Returns 0 if the session cache file is safe to trust:
+# must be owned by the current user and have no group/other read bits (0600).
+_cache_is_safe() {
+    local f="$1"
+    [ -f "$f" ] || return 1
+    local owner perm
+    owner="$(stat -f '%u' "$f" 2>/dev/null)"
+    perm="$(stat -f '%Lp' "$f" 2>/dev/null)"
+    [ "$owner" = "$(id -u)" ] || return 1
+    [ "$perm" = "600" ] && return 0
+    return 1
+}
+
+# Returns 0 if the bash command contains a destructive operation.
+# Covers pipes, subshells ($(...)), absolute paths, sudo, and quoted names.
+_is_destructive_cmd() {
+    local cmd="$1"
+    # rm/rmdir/shred/unlink — at any command boundary, with optional path/sudo/quotes
+    printf '%s' "$cmd" | grep -qE \
+        '(^|[|;&`]|\$\()[[:space:]]*(sudo[[:space:]]+)?([^[:space:]|;&>"'"'"'`]*/)?'"'"'?"?(rm|rmdir|shred|unlink)[[:space:]]' \
+    && return 0
+    # dd/mkfs/fdisk — at any command boundary
+    printf '%s' "$cmd" | grep -qE \
+        '(^|[|;&`]|\$\()[[:space:]]*(sudo[[:space:]]+)?([^[:space:]|;&>"'"'"'`]*/)?'"'"'?"?(dd[[:space:]]|mkfs|fdisk)\b' \
+    && return 0
+    # diskutil erase, find -delete, truncate
+    printf '%s' "$cmd" | grep -qE \
+        'diskutil[[:space:]]+erase|find\b.*[[:space:]]-delete([[:space:]]|$)|truncate\b' \
+    && return 0
+    return 1
+}
 
 # Returns 0 (true) when the user is watching the SPECIFIC tab/session where
 # this Claude Code instance is running. If the user is in a different terminal
@@ -201,15 +236,13 @@ case "$HOOK_TYPE" in
     # 2. Session cache → explicit allow so Claude Code skips its own prompt too.
     #    Exception: destructive Bash commands always require confirmation even when
     #    Bash is session-cached — "allow session" for ls must not silently allow rm.
-    if [ -f "$SESSION_CACHE" ] && grep -qxF "$TOOL_NAME" "$SESSION_CACHE" 2>/dev/null; then
+    if _cache_is_safe "$SESSION_CACHE" && grep -qxF "$TOOL_NAME" "$SESSION_CACHE" 2>/dev/null; then
         _is_destructive=false
         if [ "$TOOL_NAME" = "Bash" ]; then
             _cmd="$(printf '%s' "$INPUT" | jq -r '.tool_input.command // ""' 2>/dev/null)"
-            # Match the first word (or sudo + first word) against a destructive list.
-            if printf '%s' "$_cmd" | grep -qE \
-               '(^|;|&&|\|\|)[[:space:]]*(sudo[[:space:]]+)?(rm|rmdir|shred|unlink|dd\b|mkfs|fdisk|diskutil[[:space:]]+erase)'; then
+            if _is_destructive_cmd "$_cmd"; then
                 _is_destructive=true
-                log "session-cache bypass: destructive bash command — $( printf '%s' "$_cmd" | head -c 80)"
+                log "session-cache bypass: destructive bash command — $(printf '%s' "$_cmd" | head -c 80)"
             fi
         fi
         if [ "$_is_destructive" = "false" ]; then
@@ -271,8 +304,9 @@ case "$HOOK_TYPE" in
           permissionDecisionReason:"Approved via notifier banner"}}'
         ;;
       allowSession)
-        # Write to session cache so this tool is auto-allowed going forward
+        # Write to session cache (0600) so this tool is auto-allowed going forward
         printf '%s\n' "$TOOL_NAME" >> "$SESSION_CACHE"
+        chmod 0600 "$SESSION_CACHE" 2>/dev/null
         jq -n --arg tool "$TOOL_NAME" \
           '{hookSpecificOutput:{hookEventName:"PreToolUse",
             permissionDecision:"allow",
