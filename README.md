@@ -110,7 +110,7 @@ LaunchAgent로 macOS 로그인 시 자동 시작하려면:
 
 ## hook 매처 설정
 
-기본값은 `Bash|Write|Edit|MultiEdit|NotebookEdit` 도구만 게이트합니다.  
+기본값은 `Bash|Write|Edit|MultiEdit|NotebookEdit|AskUserQuestion` 도구를 게이트합니다.  
 모든 도구를 게이트하려면:
 
 ```bash

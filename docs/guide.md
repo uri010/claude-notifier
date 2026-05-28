@@ -90,7 +90,7 @@ curl http://localhost:47823/health
 
 | Hook 이벤트 | 매처 | 역할 |
 |------------|------|------|
-| `PreToolUse` | `Bash\|Write\|Edit\|MultiEdit\|NotebookEdit` | 권한 배너 (blocking) |
+| `PreToolUse` | `Bash\|Write\|Edit\|MultiEdit\|NotebookEdit\|AskUserQuestion` | 권한 배너 (blocking) / 질문 알림 |
 | `Stop` | (전체) | 작업 완료 배너 |
 | `Notification` | (전체) | 질문/알림 배너 |
 
@@ -121,9 +121,11 @@ claude
 ```
 Claude Code → hook stdin JSON
                     ↓
+           [AskUserQuestion 감지] → /notify로 질문 배너 전송 후 exit 0 (Claude Code UI 유지)
+                    ↓
            [bypass 감지] dangerouslySkipPermissions 플래그 → 즉시 통과
                     ↓
-           [세션 캐시 확인] allowSession 이력 있음 → 즉시 통과
+           [세션 캐시 확인] allowSession 이력 있음 + 위험 명령 아님 → 즉시 통과
                     ↓
            [터미널 포커스 확인] 터미널 앱이 전면에 있음 → 즉시 통과
                     ↓
@@ -136,6 +138,7 @@ Claude Code → hook stdin JSON
       allow → permissionDecision: allow
       allowSession → session 캐시 기록 + allow
       deny → permissionDecision: deny
+      focus/dismiss → exit 0 → Claude Code 터미널 UI로 위임
       timeout → exit 0 (fail-open)
 ```
 
@@ -179,6 +182,21 @@ ClaudeNotifier 앱은 1.5초 간격으로 최전면 앱을 폴링합니다.
 [터미널 감지] → clearInfoBanners() → 알림 배너 소멸 (최대 1.5초 이내)
                권한 배너는 그대로 유지 → 사용자 클릭 대기
 ```
+
+### 세션 캐시 보안 — 위험 명령 자동 예외
+
+**Session** 버튼으로 `Bash`를 세션 허용하면, 이후 모든 Bash 명령이 배너 없이 통과됩니다.  
+단, **파일·디스크를 파괴하는 명령**은 세션 캐시를 무시하고 항상 배너로 확인합니다.
+
+위험 명령 목록 (단독 실행 + `sudo`, `;`, `&&`, `||` 조합 모두 감지):
+
+| 명령 | 설명 |
+|------|------|
+| `rm`, `rmdir` | 파일/디렉터리 삭제 |
+| `shred`, `unlink` | 안전 삭제 / 링크 제거 |
+| `dd` | 디스크 직접 쓰기 |
+| `mkfs`, `fdisk` | 파티션/파일시스템 생성 |
+| `diskutil erase` | macOS 디스크 포맷 |
 
 ### Notification 알림 필터
 
@@ -239,7 +257,7 @@ Claude Code가 유휴 상태에서 보내는 "Claude is waiting for your input" 
   "hooks": {
     "PreToolUse": [
       {
-        "matcher": "Bash|Write|Edit|MultiEdit|NotebookEdit",
+        "matcher": "Bash|Write|Edit|MultiEdit|NotebookEdit|AskUserQuestion",
         "hooks": [
           {
             "type": "command",

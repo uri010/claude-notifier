@@ -300,7 +300,7 @@ cd claude-notifier</code></pre>
     <table>
       <thead><tr><th>Hook 이벤트</th><th>매처</th><th>역할</th></tr></thead>
       <tbody>
-        <tr><td><code>PreToolUse</code></td><td><code>Bash|Write|Edit|MultiEdit|NotebookEdit</code></td><td>권한 배너 (blocking)</td></tr>
+        <tr><td><code>PreToolUse</code></td><td><code>Bash|Write|Edit|MultiEdit|NotebookEdit|AskUserQuestion</code></td><td>권한 배너 (blocking) / 질문 배너 (non-blocking)</td></tr>
         <tr><td><code>Stop</code></td><td>(전체)</td><td>작업 완료 배너</td></tr>
         <tr><td><code>Notification</code></td><td>(전체)</td><td>질문/알림 배너</td></tr>
       </tbody>
@@ -316,9 +316,12 @@ cd claude-notifier</code></pre>
     <h3>PreToolUse (권한 요청)</h3>
     <pre><code>Claude Code → hook stdin JSON
                     ↓
+           [AskUserQuestion 감지] 질문 도구 → non-blocking 배너 후 즉시 exit 0
+                    ↓
            [bypass 감지] dangerouslySkipPermissions 플래그 → 즉시 통과
                     ↓
            [세션 캐시 확인] allowSession 이력 있음 → 즉시 통과
+                    (단, rm 등 위험 명령은 캐시 무시 — 항상 확인)
                     ↓
            [터미널 포커스 확인] 터미널 앱이 전면에 있음 → 즉시 통과
                     ↓
@@ -331,6 +334,7 @@ cd claude-notifier</code></pre>
       allow → permissionDecision: allow
       allowSession → session 캐시 기록 + allow
       deny → permissionDecision: deny
+      focus / dismiss → exit 0 (Claude Code 자체 UI로 위임)
       timeout → exit 0 (fail-open)</code></pre>
 
     <h3>Stop / Notification (알림)</h3>
@@ -366,6 +370,20 @@ cd claude-notifier</code></pre>
     <ul>
       <li>필터 패턴: <code>claude is waiting</code>, <code>waiting for (your) input</code> (대소문자 무관)</li>
     </ul>
+
+    <h3>세션 캐시 보안 — 위험 명령 자동 예외</h3>
+    <p><code>Allow Session</code>으로 Bash를 세션 캐시에 등록한 경우에도, 아래 명령이 포함된 Bash 호출은 항상 권한 확인을 요구합니다.</p>
+    <table>
+      <thead><tr><th>명령</th><th>포함 형태</th></tr></thead>
+      <tbody>
+        <tr><td><code>rm</code>, <code>rmdir</code></td><td>단독, <code>sudo</code>, 파이프라인(<code>&amp;&amp;</code>, <code>||</code>, <code>;</code>)</td></tr>
+        <tr><td><code>shred</code>, <code>unlink</code></td><td>동일</td></tr>
+        <tr><td><code>dd</code></td><td><code>dd </code> 또는 <code>dd</code>로 시작</td></tr>
+        <tr><td><code>mkfs</code>, <code>fdisk</code></td><td>디스크 포맷/파티션</td></tr>
+        <tr><td><code>diskutil erase</code></td><td>macOS 디스크 유틸리티</td></tr>
+      </tbody>
+    </table>
+    <div class="callout">ℹ️ <code>Allow Session for Bash</code>를 눌렀더라도 <code>rm -rf /</code> 같은 위험 명령은 반드시 배너가 표시됩니다.</div>
 
     <!-- 배너 종류 -->
     <h2 id="배너-종류">배너 종류</h2>
@@ -409,7 +427,7 @@ cd claude-notifier</code></pre>
     <h3><code>~/.claude/settings.json</code> 구조</h3>
     <pre><code>{
   "hooks": {
-    "PreToolUse": [{ "matcher": "Bash|Write|Edit|MultiEdit|NotebookEdit",
+    "PreToolUse": [{ "matcher": "Bash|Write|Edit|MultiEdit|NotebookEdit|AskUserQuestion",
         "hooks": [{ "type": "command",
             "command": "/path/to/claude-notifier/scripts/notify-hook.sh pretooluse" }] }],
     "Stop": [{ "hooks": [{ "type": "command",
