@@ -1,0 +1,756 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>Claude-Notifier 회사 노트북 운용 위험 분석</title>
+<style>
+:root {
+  --bg: #f7f8fa;
+  --surface: #ffffff;
+  --surface-2: #f1f3f6;
+  --border: #e2e6ed;
+  --text: #1a2236;
+  --muted: #7b8597;
+  --accent: #1e4d8c;
+  --accent-2: #4a348c;
+  --on: #15803d;
+  --off: #b91c1c;
+  --excluded: #c2410c;
+  --warn: #a35a00;
+  --ok: #15803d;
+  --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans KR', '맑은 고딕', system-ui, sans-serif;
+  --mono: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font-family: var(--font); line-height: 1.68; }
+.container { max-width: 1100px; margin: 0 auto; padding: 48px 32px 80px; }
+h1 { font-size: 28px; margin: 0 0 6px; font-weight: 700; letter-spacing: -0.01em; border-top: 3px solid var(--accent); padding-top: 28px; }
+h2 { font-size: 20px; margin: 52px 0 12px; padding-bottom: 8px; border-bottom: 2px solid var(--text); font-weight: 700; }
+h3 { font-size: 15px; margin: 22px 0 8px; color: var(--text); font-weight: 700; }
+h3::before { content: ""; display: inline-block; width: 3px; height: 13px; background: var(--accent); margin-right: 7px; vertical-align: -2px; border-radius: 1px; }
+p { font-size: 14px; margin: 8px 0 12px; }
+li { font-size: 14px; margin: 4px 0; }
+code { font-family: var(--mono); background: #eef1f6; border: 1px solid #dde2ea; padding: 1px 5px; border-radius: 3px; font-size: 12.5px; color: var(--accent); }
+pre { background: #0f172a; color: #cbd5e1; border: 1px solid var(--border); border-left: 3px solid var(--accent); border-radius: 4px; padding: 14px 16px; overflow-x: auto; font-family: var(--mono); font-size: 12.5px; line-height: 1.6; }
+
+.toc { background: var(--surface); border: 1px solid var(--border); border-radius: 4px; padding: 14px 20px; margin: 20px 0 32px; }
+.toc a { color: var(--text); text-decoration: none; }
+.toc a:hover { color: var(--accent); text-decoration: underline; }
+.toc ol { margin: 0; padding-left: 22px; }
+.toc li { margin: 3px 0; font-size: 13.5px; }
+
+table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 13.5px; background: var(--surface); }
+th, td { border: 1px solid var(--border); padding: 9px 12px; text-align: left; vertical-align: top; }
+th { background: #1e3a5f; color: #7dd3fc; font-weight: 600; font-size: 12.5px; }
+tr:nth-child(even) td { background: #fafbfc; }
+
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 4px; padding: 16px 18px; margin: 14px 0; box-shadow: 0 1px 3px rgba(0,0,0,0.04); }
+.card.warn { border-left: 3px solid #d97706; background: #fffbeb; }
+.card.ok   { border-left: 3px solid var(--on); background: #f0fdf4; }
+.card.ng   { border-left: 3px solid var(--off); background: #fef2f2; }
+.card.info { border-left: 3px solid var(--accent); background: #e8eef7; }
+
+.tag { display: inline-block; padding: 2px 8px; border-radius: 3px; font-size: 11px; font-weight: 700; margin-right: 4px; vertical-align: middle; letter-spacing: 0.04em; }
+.tag.resolved { background: #dcfce7; color: var(--on); }
+.tag.pending  { background: #fef3c7; color: var(--warn); }
+.tag.warn     { background: #ffedd5; color: var(--excluded); }
+.tag.ng       { background: #fee2e2; color: var(--off); }
+.tag.ok       { background: #dcfce7; color: var(--on); }
+.tag.high     { background: #fee2e2; color: #991b1b; }
+.tag.medium   { background: #fef3c7; color: #92400e; }
+.tag.low      { background: #f0fdf4; color: #166534; }
+
+.divider { height: 1px; background: var(--border); margin: 40px 0; }
+.lead { color: var(--muted); font-size: 14px; margin: 4px 0 24px; }
+
+/* HIGH severity row animation */
+.row-high  { animation: row-high 2.8s ease-in-out infinite; }
+@keyframes row-high  { 0%, 100% { background: #fee2e2; } 50% { background: #fecaca; } }
+
+/* 아코디언 */
+.acc-list { display: flex; flex-direction: column; gap: 8px; margin: 14px 0; }
+.acc-item { background: var(--surface); border: 1px solid var(--border); border-radius: 4px; overflow: hidden; cursor: pointer; box-shadow: 0 1px 3px rgba(0,0,0,0.04); transition: box-shadow 0.2s; }
+.acc-item:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+.acc-item.open { border-color: var(--accent); }
+.acc-header { display: flex; align-items: center; gap: 14px; padding: 16px 18px; user-select: none; }
+.acc-badge { width: 30px; height: 30px; border-radius: 4px; color: white; font-size: 14px; font-weight: 800; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.acc-badge.high   { background: #dc2626; }
+.acc-badge.medium { background: #d97706; }
+.acc-badge.low    { background: #059669; }
+.acc-title-wrap { flex: 1; min-width: 0; }
+.acc-title { display: block; font-size: 15px; font-weight: 700; color: var(--text); }
+.acc-desc  { display: block; font-size: 12.5px; color: var(--muted); margin-top: 3px; }
+.acc-chips { display: flex; gap: 6px; flex-shrink: 0; }
+.chip-high   { background: #fee2e2; color: #991b1b; padding: 3px 9px; border-radius: 3px; font-size: 12px; font-weight: 700; }
+.chip-medium { background: #fef3c7; color: #92400e; padding: 3px 9px; border-radius: 3px; font-size: 12px; font-weight: 700; }
+.chip-low    { background: #dcfce7; color: #166534; padding: 3px 9px; border-radius: 3px; font-size: 12px; font-weight: 700; }
+.acc-arrow { color: var(--muted); font-size: 12px; transition: transform 0.25s; flex-shrink: 0; }
+.acc-item.open .acc-arrow { transform: rotate(180deg); }
+.acc-body { max-height: 0; overflow: hidden; transition: max-height 0.35s ease; }
+.acc-item.open .acc-body { max-height: 1200px; }
+.acc-body-inner { padding: 0 18px 18px; border-top: 1px solid var(--border); background: #fafbfc; }
+.acc-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; padding-top: 14px; }
+@media (max-width: 680px) { .acc-cols { grid-template-columns: 1fr; } }
+.acc-col-head { font-size: 11.5px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; margin: 0 0 8px; }
+.acc-col-head.ng { color: #991b1b; }
+.acc-col-head.ok { color: #166534; }
+.acc-body-inner ul { margin: 0; padding-left: 18px; }
+.acc-body-inner li { font-size: 13.5px; color: var(--text); margin: 6px 0; line-height: 1.6; }
+.evidence { background: #0f172a; color: #94a3b8; border-radius: 4px; padding: 10px 14px; font-family: var(--mono); font-size: 12px; margin: 10px 0; line-height: 1.6; }
+.evidence .file { color: #7dd3fc; }
+.evidence .val  { color: #fbbf24; }
+
+/* 아키텍처 다이어그램 */
+.arch-flow { display: flex; align-items: center; flex-wrap: wrap; gap: 0; margin: 16px 0; }
+.arch-box { background: var(--surface); border: 2px solid var(--border); border-radius: 6px; padding: 10px 16px; font-size: 13px; font-weight: 600; text-align: center; min-width: 110px; }
+.arch-box.primary { border-color: var(--accent); background: #e8eef7; color: var(--accent); }
+.arch-box.script  { border-color: #d97706; background: #fffbeb; color: #92400e; }
+.arch-box.http    { border-color: #7c3aed; background: #f5f3ff; color: #4c1d95; }
+.arch-box.app     { border-color: #059669; background: #f0fdf4; color: #064e3b; }
+.arch-box.ui      { border-color: #db2777; background: #fdf2f8; color: #831843; }
+.arch-arrow { font-size: 20px; color: var(--muted); padding: 0 6px; }
+.arch-label { font-size: 10.5px; color: var(--muted); display: block; font-weight: 400; margin-top: 2px; }
+
+/* 권고사항 단계 */
+.rec-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin: 16px 0; }
+@media (max-width: 780px) { .rec-grid { grid-template-columns: 1fr; } }
+.rec-card { border: 1px solid var(--border); border-radius: 6px; padding: 16px; background: var(--surface); }
+.rec-card h4 { margin: 0 0 10px; font-size: 13.5px; font-weight: 700; }
+.rec-card ul { margin: 0; padding-left: 16px; }
+.rec-card li { font-size: 13px; margin: 6px 0; }
+.rec-now  { border-top: 3px solid #dc2626; }
+.rec-soon { border-top: 3px solid #d97706; }
+.rec-mid  { border-top: 3px solid #2563eb; }
+</style>
+</head>
+<body>
+<div class="container">
+
+<h1>Claude-Notifier 회사 노트북 운용 위험 분석</h1>
+<p class="lead">macOS MDM 관리 환경(Jamf Pro / Workspace ONE / CrowdStrike 등)에서 claude-notifier 실행 시 예상되는 문제점 종합 검토 — 2026-06-01</p>
+
+<div class="toc">
+  <ol>
+    <li><a href="#arch">아키텍처 요약</a></li>
+    <li><a href="#risks">위험 항목별 상세 분석</a> (10개 항목)</li>
+    <li><a href="#matrix">위험 매트릭스</a></li>
+    <li><a href="#recs">조치 권고사항</a></li>
+  </ol>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<h2 id="arch">1. 아키텍처 요약</h2>
+
+<p>claude-notifier는 세 개의 독립 컴포넌트로 구성된다. 각 컴포넌트가 회사 보안 정책과 교차하는 지점이 위험의 출처다.</p>
+
+<div class="arch-flow">
+  <div class="arch-box primary">Claude Code<br><span class="arch-label">CLI (Electron)</span></div>
+  <span class="arch-arrow">→</span>
+  <div class="arch-box script">notify-hook.sh<br><span class="arch-label">PreToolUse / Stop hook</span></div>
+  <span class="arch-arrow">→</span>
+  <div class="arch-box http">HTTP POST<br><span class="arch-label">127.0.0.1:47823</span></div>
+  <span class="arch-arrow">→</span>
+  <div class="arch-box app">ClaudeNotifier<br><span class="arch-label">SwiftUI · BSD socket</span></div>
+  <span class="arch-arrow">→</span>
+  <div class="arch-box ui">NSPanel Banner<br><span class="arch-label">floating UI</span></div>
+</div>
+<div class="arch-flow" style="margin-top:4px;">
+  <div style="width:110px;min-width:110px;"></div>
+  <span style="padding:0 6px;width:20px;"></span>
+  <div class="arch-box script" style="font-size:12px;min-width:140px;">osascript<br><span class="arch-label">Terminal TTY 조회</span></div>
+  <span class="arch-arrow">←→</span>
+  <div class="arch-box app" style="font-size:12px;min-width:140px;">LaunchAgent<br><span class="arch-label">~/Library/LaunchAgents/</span></div>
+</div>
+
+<div class="card info" style="margin-top:18px;">
+  <strong>핵심 파일</strong><br>
+  <code>Sources/ClaudeNotifier/HTTPServer.swift</code> — BSD socket HTTP 서버 &nbsp;|&nbsp;
+  <code>Sources/ClaudeNotifier/main.swift:5</code> — 포트 47823 하드코딩 &nbsp;|&nbsp;
+  <code>scripts/notify-hook.sh</code> — Claude Code PreToolUse/Stop 훅 &nbsp;|&nbsp;
+  <code>scripts/install-launchagent.sh</code> — LaunchAgent 설치
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<h2 id="risks">2. 위험 항목별 상세 분석</h2>
+
+<div class="acc-list">
+
+  <!-- ① Gatekeeper -->
+  <div class="acc-item">
+    <div class="acc-header">
+      <div class="acc-badge high">1</div>
+      <div class="acc-title-wrap">
+        <span class="acc-title">Gatekeeper / Code Signing — 서명 없는 바이너리</span>
+        <span class="acc-desc">ad-hoc 서명만 존재, Apple 공증(notarization) 없음 → 기업 Mac에서 실행 자체가 차단될 수 있음</span>
+      </div>
+      <div class="acc-chips"><span class="chip-high">HIGH</span></div>
+      <span class="acc-arrow">▼</span>
+    </div>
+    <div class="acc-body">
+      <div class="acc-body-inner">
+        <div class="acc-cols">
+          <div>
+            <p class="acc-col-head ng">문제 근거</p>
+            <div class="evidence">
+              <span class="file">$ codesign -dv ClaudeNotifier</span><br>
+              Signature=<span class="val">adhoc</span><br>
+              TeamIdentifier=<span class="val">not set</span><br>
+              Info.plist=<span class="val">not bound</span>
+            </div>
+            <ul>
+              <li>빌드 후 <code>swift build -c release</code>로 생성된 바이너리는 ad-hoc 서명만 가짐</li>
+              <li>Apple Developer ID / Team ID 없음 → Gatekeeper "확인되지 않은 개발자" 경고</li>
+              <li>기업 MDM이 <code>com.apple.systempolicy.control</code> payload로 정책을 "App Store + Identified Developers"로 잠그면 <strong>수동 우회도 MDM 재적용으로 롤백됨</strong></li>
+              <li><code>install-launchagent.sh:49</code> — <code>launchctl load</code> 시점에 quarantine 플래그 검사 → 서명 미통과 시 LaunchAgent 로드 실패</li>
+            </ul>
+          </div>
+          <div>
+            <p class="acc-col-head ok">완화 방안</p>
+            <ul>
+              <li>회사 Apple Developer 계정으로 Developer ID Application 서명 + <code>notarytool</code> 공증</li>
+              <li>Jamf Self Service를 통해 패키지(.pkg)로 배포하는 방법도 유효</li>
+              <li>단기: <code>xattr -d com.apple.quarantine &lt;binary&gt;</code> (MDM이 잠겨 있지 않은 경우만 작동)</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ② Privacy / AppleEvents -->
+  <div class="acc-item">
+    <div class="acc-header">
+      <div class="acc-badge high">2</div>
+      <div class="acc-title-wrap">
+        <span class="acc-title">Privacy Permissions — osascript / AppleEvents MDM 사전 거부</span>
+        <span class="acc-desc">notify-hook.sh가 osascript로 Terminal TTY를 조회 → PPPC payload로 차단 시 터미널 포커스 감지 완전 불능</span>
+      </div>
+      <div class="acc-chips"><span class="chip-high">HIGH</span></div>
+      <span class="acc-arrow">▼</span>
+    </div>
+    <div class="acc-body">
+      <div class="acc-body-inner">
+        <div class="acc-cols">
+          <div>
+            <p class="acc-col-head ng">문제 근거</p>
+            <div class="evidence">
+              <span class="file">notify-hook.sh:110</span><br>
+              frontmost="$(<span class="val">osascript</span> -e \<br>
+              &nbsp;&nbsp;'tell application "System Events"<br>
+              &nbsp;&nbsp;&nbsp;to return name of first application process<br>
+              &nbsp;&nbsp;&nbsp;whose frontmost is true')"
+            </div>
+            <div class="evidence">
+              <span class="file">notify-hook.sh:117</span><br>
+              frontmost_tty="$(<span class="val">osascript</span> -e \<br>
+              &nbsp;&nbsp;'tell application "Terminal"<br>
+              &nbsp;&nbsp;&nbsp;to return tty of selected tab of front window')"
+            </div>
+            <ul>
+              <li>macOS Mojave 이후 Apple Events는 <strong>개별 앱 단위로 Automation 권한 필요</strong></li>
+              <li>MDM의 <code>com.apple.TCC.configuration-profile-policy</code> payload로 <code>AppleEvents</code>를 <strong>Deny</strong>로 잠글 수 있음</li>
+              <li>차단 시: osascript가 <code>-1743 (Not Authorized to Send Apple Events)</code> 반환 → <code>is_terminal_focused()</code>가 항상 <code>return 1</code></li>
+              <li>결과: 터미널이 실제로 포커스되어 있어도 매번 배너가 팝업되는 오작동 또는, 반대로 모든 hook이 fail-open(무조건 허용)될 수 있음</li>
+            </ul>
+          </div>
+          <div>
+            <p class="acc-col-head ok">완화 방안</p>
+            <ul>
+              <li>MDM 관리자에게 PPPC payload에 <code>ClaudeNotifier</code> 및 <code>bash</code>를 <code>AppleEvents → Terminal.app / System Events</code> Allowed로 추가 요청</li>
+              <li>AppleEvents 없이 동작하는 폴백 경로 구현 (NSWorkspace API만 사용)</li>
+              <li>osascript 실패를 graceful하게 처리해 false-positive 배너 억제 필요</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ③ EDR Hook Script Detection -->
+  <div class="acc-item">
+    <div class="acc-header">
+      <div class="acc-badge high">3</div>
+      <div class="acc-title-wrap">
+        <span class="acc-title">EDR 행동 탐지 — Hook Script 실행 패턴</span>
+        <span class="acc-desc">bash가 ps + osascript + curl(localhost) 조합을 매 도구 호출마다 실행 → CrowdStrike/Falcon Behavioral Prevention 시그니처 매칭 가능</span>
+      </div>
+      <div class="acc-chips"><span class="chip-high">HIGH</span></div>
+      <span class="acc-arrow">▼</span>
+    </div>
+    <div class="acc-body">
+      <div class="acc-body-inner">
+        <div class="acc-cols">
+          <div>
+            <p class="acc-col-head ng">문제 근거</p>
+            <div class="evidence">
+              <span class="file">notify-hook.sh:192-202</span> — 프로세스 트리 순회<br>
+              for _i in 1..10; do<br>
+              &nbsp;&nbsp;<span class="val">ps -p "$_tp" -o args=</span>  # 각 부모 PID 확인<br>
+              done<br><br>
+              <span class="file">notify-hook.sh:110</span> — osascript 호출<br>
+              <span class="file">notify-hook.sh:185</span> — curl http://127.0.0.1:47823/event
+            </div>
+            <ul>
+              <li><strong>단일 bash 프로세스가 (1) 프로세스 열거, (2) Apple Events, (3) 로컬 HTTP 연결</strong>을 순차 실행 — EDR 행동 시그니처 조합 해당</li>
+              <li>Claude Code가 도구를 호출할 때마다(초당 수회 가능) hook이 반복 실행됨</li>
+              <li>CrowdStrike Falcon Behavioral Prevention: "Script executing network connection" + "Process discovery via ps" = MEDIUM 위협</li>
+              <li>차단 시: hook 프로세스에 <code>SIGSTOP</code> 또는 종료 → <code>notify-hook.sh</code>가 응답 대기(최대 45초) 후 timeout → Claude Code가 45초간 stall</li>
+            </ul>
+          </div>
+          <div>
+            <p class="acc-col-head ok">완화 방안</p>
+            <ul>
+              <li>EDR 정책 담당자에게 <code>notify-hook.sh</code> 절대 경로를 프로세스 exclusion으로 등록</li>
+              <li><code>ClaudeNotifier</code> 바이너리도 exclusion 목록에 추가</li>
+              <li>ps 프로세스 트리 순회 횟수 축소 (현재 최대 10회, 대부분 2~3회면 충분)</li>
+              <li>hook 타임아웃(<code>CLAUDE_NOTIFIER_WAIT</code>, 기본 45초) 축소로 stall 시간 단축</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ④ SSL Inspection Proxy -->
+  <div class="acc-item">
+    <div class="acc-header">
+      <div class="acc-badge high">4</div>
+      <div class="acc-title-wrap">
+        <span class="acc-title">SSL Inspection Proxy — api.anthropic.com 차단</span>
+        <span class="acc-desc">Zscaler / Cisco Umbrella가 AI 서비스 카테고리 차단 정책을 적용하면 Claude Code 자체가 API 호출 불가 (notifier의 간접 영향)</span>
+      </div>
+      <div class="acc-chips"><span class="chip-high">HIGH</span></div>
+      <span class="acc-arrow">▼</span>
+    </div>
+    <div class="acc-body">
+      <div class="acc-body-inner">
+        <div class="acc-cols">
+          <div>
+            <p class="acc-col-head ng">문제 근거</p>
+            <ul>
+              <li>claude-notifier 자체는 외부 API를 호출하지 않음 (<code>HTTPServer.swift:29</code> — 127.0.0.1만 바인드)</li>
+              <li>그러나 Claude Code가 <code>api.anthropic.com</code>으로 HTTPS 요청을 보낼 때 기업 프록시의 SSL inspection을 통과해야 함</li>
+              <li>Zscaler의 "AI/ML Applications" 카테고리 차단 정책이 활성화된 경우 → <code>api.anthropic.com</code> 403 또는 SSL 오류</li>
+              <li>curl이 Homebrew 빌드(시스템 keychain 미사용)인 경우 기업 CA 인증서를 신뢰하지 않아 SSL 검증 실패 가능</li>
+            </ul>
+          </div>
+          <div>
+            <p class="acc-col-head ok">완화 방안</p>
+            <ul>
+              <li>IT 보안팀에 <code>api.anthropic.com</code> URL policy exception 요청</li>
+              <li>기업 CA가 시스템 keychain에 설치된 경우 macOS 기본 curl은 자동 신뢰 (Homebrew curl 사용 시 <code>--cacert</code> 설정 필요)</li>
+              <li>회사 프록시 설정이 있으면 Claude Code의 <code>HTTPS_PROXY</code> 환경변수 설정</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ⑤ Port Listener -->
+  <div class="acc-item">
+    <div class="acc-header">
+      <div class="acc-badge medium">5</div>
+      <div class="acc-title-wrap">
+        <span class="acc-title">비표준 포트 47823 TCP Listen</span>
+        <span class="acc-desc">localhost 전용이지만 비표준 포트 listen은 EDR "unusual service listening" 이벤트를 생성할 수 있음</span>
+      </div>
+      <div class="acc-chips"><span class="chip-medium">MEDIUM</span></div>
+      <span class="acc-arrow">▼</span>
+    </div>
+    <div class="acc-body">
+      <div class="acc-body-inner">
+        <div class="acc-cols">
+          <div>
+            <p class="acc-col-head ng">문제 근거</p>
+            <div class="evidence">
+              <span class="file">main.swift:5</span><br>
+              let kDefaultPort: UInt16 = <span class="val">47823</span><br><br>
+              <span class="file">HTTPServer.swift:29</span><br>
+              addr.sin_addr.s_addr = inet_addr("<span class="val">127.0.0.1</span>")
+            </div>
+            <ul>
+              <li>포트 충돌: 다른 앱이 47823을 사용 중이면 <code>bindFailed(errno)</code> → <code>exit(2)</code>로 앱 종료</li>
+              <li>Palo Alto Cortex XDR: 비표준 포트 listen → "suspicious service listening" 이벤트 생성 → 보안팀 조사 유발</li>
+              <li>외부 노출 없음 (127.0.0.1 전용)이지만 <strong>같은 머신의 다른 프로세스가 인증 없이 접근 가능</strong> (아래 항목 8 참조)</li>
+            </ul>
+          </div>
+          <div>
+            <p class="acc-col-head ok">완화 방안</p>
+            <ul>
+              <li>환경변수 <code>CLAUDE_NOTIFIER_PORT</code>로 포트 변경 가능 (LaunchAgent plist에 <code>EnvironmentVariables</code> 추가)</li>
+              <li>포트 충돌 시 다른 포트로 자동 retry 로직 추가 검토</li>
+              <li>EDR allowlist에 <code>ClaudeNotifier</code> 바이너리 등록으로 이벤트 억제</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ⑥ LaunchAgent Binary Allowlisting -->
+  <div class="acc-item">
+    <div class="acc-header">
+      <div class="acc-badge medium">6</div>
+      <div class="acc-title-wrap">
+        <span class="acc-title">LaunchAgent — Santa / Jamf Protect 바이너리 차단</span>
+        <span class="acc-desc">Google Santa 또는 Jamf Protect의 binary allowlist가 적용된 경우, 서명 없는 바이너리는 LaunchAgent 등록은 되지만 실행 즉시 SIGKILL</span>
+      </div>
+      <div class="acc-chips"><span class="chip-medium">MEDIUM</span></div>
+      <span class="acc-arrow">▼</span>
+    </div>
+    <div class="acc-body">
+      <div class="acc-body-inner">
+        <div class="acc-cols">
+          <div>
+            <p class="acc-col-head ng">문제 근거</p>
+            <div class="evidence">
+              <span class="file">install-launchagent.sh:20-43</span><br>
+              Label: <span class="val">com.claude.notifier</span><br>
+              ProgramArguments: <span class="val">&lt;BIN&gt;</span><br>
+              KeepAlive: <span class="val">true</span>  ← 차단 시 반복 재시작 시도
+            </div>
+            <ul>
+              <li>Google Santa (LOCKDOWN 모드): 허용되지 않은 바이너리 → 실행 차단 + 알림</li>
+              <li>Jamf Protect "Restricted Software": 프로세스 이름 <code>ClaudeNotifier</code> 기준으로 실행 차단 설정 가능</li>
+              <li><code>KeepAlive: true</code>로 설정되어 있어 차단 시 30초마다 재시작 시도 반복 → 보안팀 대량 알림 유발 가능</li>
+            </ul>
+          </div>
+          <div>
+            <p class="acc-col-head ok">완화 방안</p>
+            <ul>
+              <li>Developer ID 서명 + 공증이 가장 확실한 해결책</li>
+              <li>Santa allowlist에 바이너리 SHA-256 hash 또는 TeamID 등록</li>
+              <li>KeepAlive를 <code>false</code>로 변경하거나 ThrottleInterval 증가 (반복 차단 알림 방지)</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ⑦ DLP Log Scanning -->
+  <div class="acc-item">
+    <div class="acc-header">
+      <div class="acc-badge medium">7</div>
+      <div class="acc-title-wrap">
+        <span class="acc-title">DLP 스캔 — 로그 파일에 명령어·파일 경로 기록</span>
+        <span class="acc-desc">~/.claude-notifier/notifier.log (0600)에 bash 명령어, 파일 경로가 최대 300자씩 기록됨 → DLP 에이전트 수집 대상</span>
+      </div>
+      <div class="acc-chips"><span class="chip-medium">MEDIUM</span></div>
+      <span class="acc-arrow">▼</span>
+    </div>
+    <div class="acc-body">
+      <div class="acc-body-inner">
+        <div class="acc-cols">
+          <div>
+            <p class="acc-col-head ng">문제 근거</p>
+            <div class="evidence">
+              <span class="file">notify-hook.sh:266-272</span><br>
+              TOOL_SUMMARY="$(jq -r '<br>
+              &nbsp;.tool_input as $i |<br>
+              &nbsp;if $i.command then $i.<span class="val">command</span>  # bash 명령어 전체<br>
+              &nbsp;elif $i.file_path then $i.<span class="val">file_path</span><br>
+              &nbsp;...' | head -c <span class="val">300</span>)"
+            </div>
+            <div class="evidence">
+              <span class="file">Logger.swift:6-7</span><br>
+              let dir = "~/.claude-notifier"<br>
+              <span class="file">Logger.swift:9</span><br>
+              attributes: [.posixPermissions: <span class="val">0o700</span>]
+            </div>
+            <ul>
+              <li>로그에는 bash 명령어 전체 텍스트, 파일 경로, URL이 포함됨</li>
+              <li>파일 권한은 0600이지만 Forcepoint / Symantec DLP 에이전트는 root 권한으로 스캔 가능</li>
+              <li>로그 파일 로테이션 없음 → 파일이 무한 증가 (수 MB → GB 수준 가능)</li>
+              <li>세션 캐시 파일 <code>~/.claude-notifier/sessions/allowed-*</code>도 같은 경로에 존재</li>
+            </ul>
+          </div>
+          <div>
+            <p class="acc-col-head ok">완화 방안</p>
+            <ul>
+              <li><code>TOOL_SUMMARY</code>에 명령어 전체 대신 <strong>도구 이름 + 문자 수</strong>만 기록 (예: <code>Bash[42chars]</code>)</li>
+              <li>로그 파일 로테이션 추가: 일정 크기(예: 5MB) 초과 시 rotate</li>
+              <li>민감 정보(파일 경로의 절대 경로)를 상대 경로 또는 해시로 대체</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ⑧ Unauthenticated HTTP -->
+  <div class="acc-item">
+    <div class="acc-header">
+      <div class="acc-badge medium">8</div>
+      <div class="acc-title-wrap">
+        <span class="acc-title">인증 없는 로컬 HTTP 서버 — 로컬 프로세스 spoofing 가능</span>
+        <span class="acc-desc">동일 머신의 어떤 프로세스도 /event·/respond/{id}에 POST 가능 → 악성 앱이 가짜 "allow" 결정을 주입할 수 있음</span>
+      </div>
+      <div class="acc-chips"><span class="chip-medium">MEDIUM</span></div>
+      <span class="acc-arrow">▼</span>
+    </div>
+    <div class="acc-body">
+      <div class="acc-body-inner">
+        <div class="acc-cols">
+          <div>
+            <p class="acc-col-head ng">문제 근거</p>
+            <div class="evidence">
+              <span class="file">HTTPServer.swift:118</span><br>
+              let (status, ct, resp) = <span class="val">handler?</span>(method, path, body)<br>
+              <span class="file">main.swift:118-131</span><br>
+              POST /respond/{id} — <span class="val">인증 없음</span><br>
+              {"decision":"allow"} → 즉시 적용
+            </div>
+            <ul>
+              <li>회사 노트북에는 여러 앱(Electron, VS Code 확장 등)이 localhost 포트를 스캔하거나 접근할 수 있음</li>
+              <li>공격자가 ID 값을 예측할 수 없어야 하지만 (UUID), 같은 세션에서 네트워크 트래픽 덤프 시 노출 가능</li>
+              <li><code>POST /clear</code>로 모든 권한 배너를 강제 삭제 가능 → deny 배너도 사라짐</li>
+            </ul>
+          </div>
+          <div>
+            <p class="acc-col-head ok">완화 방안</p>
+            <ul>
+              <li>요청 헤더에 HMAC 기반 shared secret 검증 추가 (비밀값은 앱 기동 시 생성하여 hook 스크립트 환경으로 전달)</li>
+              <li>또는 Unix domain socket으로 전환 (파일 권한으로 접근 제어)</li>
+              <li><code>POST /clear</code>에 인증 요구 추가 (현재는 완전 오픈)</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ⑨ jq dependency -->
+  <div class="acc-item">
+    <div class="acc-header">
+      <div class="acc-badge low">9</div>
+      <div class="acc-title-wrap">
+        <span class="acc-title">jq 의존성 — 회사 Mac에 미설치 가능</span>
+        <span class="acc-desc">notify-hook.sh 전체가 jq에 의존. jq 없으면 hook이 완전히 동작하지 않음.</span>
+      </div>
+      <div class="acc-chips"><span class="chip-low">LOW</span></div>
+      <span class="acc-arrow">▼</span>
+    </div>
+    <div class="acc-body">
+      <div class="acc-body-inner">
+        <div class="acc-cols">
+          <div>
+            <p class="acc-col-head ng">문제 근거</p>
+            <div class="evidence">
+              <span class="file">notify-hook.sh:32-33</span><br>
+              field() { printf '%s' "$INPUT" | <span class="val">jq -r</span> "$1 // empty" 2>/dev/null; }<br><br>
+              SESSION_ID="$(field '.session_id')"  # 첫 번째 jq 호출
+            </div>
+            <ul>
+              <li>macOS 기본 설치에 jq 미포함 (Homebrew 설치 필요)</li>
+              <li>회사 노트북에 Homebrew 설치가 IT 정책으로 금지된 경우 jq 없음</li>
+              <li>jq 미설치 시 모든 <code>field()</code> 호출 실패 → SESSION_ID, TOOL_NAME, CWD 등 핵심 값이 빈 문자열 → hook 전체 오작동</li>
+              <li>에러 출력이 <code>2>/dev/null</code>로 억제되어 <strong>실패 원인 파악이 어려움</strong></li>
+            </ul>
+          </div>
+          <div>
+            <p class="acc-col-head ok">완화 방안</p>
+            <ul>
+              <li>hook 시작 시 <code>command -v jq &gt;/dev/null || { log "jq 없음"; exit 0; }</code> 명시적 체크 추가</li>
+              <li><code>python3 -c "import json,sys; ..."</code> 폴백 (macOS 기본 포함)</li>
+              <li>README / 설치 스크립트에 jq 의존성 명시</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ⑩ Log Rotation -->
+  <div class="acc-item">
+    <div class="acc-header">
+      <div class="acc-badge low">10</div>
+      <div class="acc-title-wrap">
+        <span class="acc-title">로그 파일 무제한 증가 — 로테이션 없음</span>
+        <span class="acc-desc">~/.claude-notifier/notifier.log는 append-only이며 크기 제한·로테이션 없음</span>
+      </div>
+      <div class="acc-chips"><span class="chip-low">LOW</span></div>
+      <span class="acc-arrow">▼</span>
+    </div>
+    <div class="acc-body">
+      <div class="acc-body-inner">
+        <div class="acc-cols">
+          <div>
+            <p class="acc-col-head ng">문제 근거</p>
+            <div class="evidence">
+              <span class="file">Logger.swift:29-36</span><br>
+              h.seekToEndOfFile()  // 항상 파일 끝에 추가<br>
+              h.write(Data(line.utf8))  // 크기 체크 없음
+            </div>
+            <ul>
+              <li>LaunchAgent가 활성화된 상태에서 Claude Code를 집중 사용하면 일 단위로 수 MB 증가 가능</li>
+              <li>회사 DLP 에이전트가 파일 크기 급증을 이상 징후로 감지할 수 있음</li>
+              <li>디스크 공간 부족 시 FileHandle 쓰기 실패 → 로그 손실 (에러 처리 없음)</li>
+            </ul>
+          </div>
+          <div>
+            <p class="acc-col-head ok">완화 방안</p>
+            <ul>
+              <li>Logger에 크기 기반 로테이션 추가: 파일 크기가 N MB 초과 시 .1, .2 순으로 rotate</li>
+              <li>또는 macOS <code>os_log</code> / <code>unified logging system</code>으로 전환 (자동 로테이션, 암호화)</li>
+              <li>설치 시 <code>logrotate</code> 설정 배포 (launchd 연동)</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- acc-list -->
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<h2 id="matrix">3. 위험 매트릭스</h2>
+
+<p>HIGH 행은 실제 영향 가시화를 위해 강조 표시된다.</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>#</th>
+      <th>항목</th>
+      <th>심각도</th>
+      <th>주요 영향</th>
+      <th>영향 컴포넌트</th>
+      <th>해결 난이도</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr class="row-high">
+      <td>1</td>
+      <td><strong>Gatekeeper / Code Signing</strong></td>
+      <td><span class="tag high">HIGH</span></td>
+      <td>앱 실행 자체 차단 (LaunchAgent 로드 실패)</td>
+      <td>ClaudeNotifier 바이너리</td>
+      <td>중 (Developer ID 서명 필요)</td>
+    </tr>
+    <tr class="row-high">
+      <td>2</td>
+      <td><strong>Privacy / osascript MDM 차단</strong></td>
+      <td><span class="tag high">HIGH</span></td>
+      <td>터미널 포커스 감지 완전 불능 → 오작동 배너</td>
+      <td>notify-hook.sh, TmuxFocus.swift</td>
+      <td>높 (MDM 관리자 필요)</td>
+    </tr>
+    <tr class="row-high">
+      <td>3</td>
+      <td><strong>EDR Hook Script 탐지</strong></td>
+      <td><span class="tag high">HIGH</span></td>
+      <td>hook 차단 시 Claude Code 45초 stall</td>
+      <td>notify-hook.sh</td>
+      <td>중 (EDR exclusion 등록)</td>
+    </tr>
+    <tr class="row-high">
+      <td>4</td>
+      <td><strong>SSL Inspection Proxy</strong></td>
+      <td><span class="tag high">HIGH</span></td>
+      <td>api.anthropic.com 차단 → Claude Code 동작 불가</td>
+      <td>Claude Code (간접)</td>
+      <td>중 (URL policy exception)</td>
+    </tr>
+    <tr>
+      <td>5</td>
+      <td>비표준 포트 47823 Listen</td>
+      <td><span class="tag medium">MEDIUM</span></td>
+      <td>EDR 이벤트 생성, bind 실패 시 앱 종료</td>
+      <td>HTTPServer.swift</td>
+      <td>낮 (환경변수로 포트 변경)</td>
+    </tr>
+    <tr>
+      <td>6</td>
+      <td>LaunchAgent 바이너리 차단</td>
+      <td><span class="tag medium">MEDIUM</span></td>
+      <td>자동 시작 불가, 반복 재시작으로 보안팀 알림</td>
+      <td>LaunchAgent plist</td>
+      <td>중 (Santa allowlist)</td>
+    </tr>
+    <tr>
+      <td>7</td>
+      <td>DLP 로그 파일 스캔</td>
+      <td><span class="tag medium">MEDIUM</span></td>
+      <td>명령어·파일 경로 DLP 수집 가능</td>
+      <td>Logger.swift, notify-hook.sh</td>
+      <td>낮 (로그 내용 축소)</td>
+    </tr>
+    <tr>
+      <td>8</td>
+      <td>인증 없는 로컬 HTTP</td>
+      <td><span class="tag medium">MEDIUM</span></td>
+      <td>로컬 프로세스가 가짜 allow 결정 주입 가능</td>
+      <td>HTTPServer.swift</td>
+      <td>중 (HMAC 또는 Unix socket)</td>
+    </tr>
+    <tr>
+      <td>9</td>
+      <td>jq 의존성 미설치</td>
+      <td><span class="tag low">LOW</span></td>
+      <td>hook 전체 오작동 (에러 억제로 진단 어려움)</td>
+      <td>notify-hook.sh</td>
+      <td>낮 (설치 확인 추가)</td>
+    </tr>
+    <tr>
+      <td>10</td>
+      <td>로그 파일 무제한 증가</td>
+      <td><span class="tag low">LOW</span></td>
+      <td>디스크 점유, DLP 이상 감지 유발</td>
+      <td>Logger.swift</td>
+      <td>낮 (로테이션 추가)</td>
+    </tr>
+  </tbody>
+</table>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<h2 id="recs">4. 조치 권고사항</h2>
+
+<div class="rec-grid">
+  <div class="rec-card rec-now">
+    <h4>🔴 즉시 (코드 변경 없이 가능)</h4>
+    <ul>
+      <li><strong>EDR exclusion 요청</strong> — <code>notify-hook.sh</code> 절대 경로 + <code>ClaudeNotifier</code> 바이너리를 IT 보안팀에 프로세스 exclusion 등록 요청</li>
+      <li><strong>quarantine 제거</strong> — <code>xattr -d com.apple.quarantine &lt;binary&gt;</code> (MDM 미잠금 시)</li>
+      <li><strong>jq 설치 확인</strong> — <code>brew install jq</code> 또는 IT 채널로 설치 승인</li>
+      <li><strong>CLAUDE_NOTIFIER_WAIT 축소</strong> — 기본 45초 → 15초로 환경변수 설정 (stall 시간 단축)</li>
+    </ul>
+  </div>
+  <div class="rec-card rec-soon">
+    <h4>🟡 단기 (코드 수정)</h4>
+    <ul>
+      <li><strong>Developer ID 서명</strong> — 회사 Apple Developer 계정으로 서명 + notarytool 공증 (<code>install-launchagent.sh</code>에 <code>codesign</code> 단계 추가)</li>
+      <li><strong>로그 내용 축소</strong> — <code>TOOL_SUMMARY</code>를 도구명 + 길이만 기록하도록 <code>notify-hook.sh:266-272</code> 수정</li>
+      <li><strong>jq 의존성 체크</strong> — hook 상단에 <code>command -v jq</code> 확인 추가</li>
+      <li><strong>KeepAlive 조건부</strong> — Santa 차단 시 무한 재시작 방지를 위해 ThrottleInterval 값 증가</li>
+    </ul>
+  </div>
+  <div class="rec-card rec-mid">
+    <h4>🔵 중기 (설계 개선)</h4>
+    <ul>
+      <li><strong>Unix domain socket 전환</strong> — TCP 포트 제거 → 파일 권한 기반 접근 제어 + EDR 포트 탐지 원천 차단</li>
+      <li><strong>HMAC 인증</strong> — 앱 기동 시 shared secret 생성, hook과 공유하여 HTTP 요청 서명 검증</li>
+      <li><strong>os_log 전환</strong> — <code>Logger.swift</code>를 macOS Unified Logging으로 교체 (자동 로테이션 + 암호화)</li>
+      <li><strong>MDM PPPC payload 배포</strong> — MDM 관리자와 협의하여 <code>bash</code>의 AppleEvents → Terminal.app Allowed 엔트리 등록</li>
+    </ul>
+  </div>
+</div>
+
+<div class="card warn" style="margin-top:24px;">
+  <strong>주의</strong> — 항목 1(Gatekeeper)과 항목 2(Privacy MDM)는 개인 개발자가 독립적으로 해결하기 어렵고 <strong>회사 IT/보안팀 협력이 필수</strong>다. 먼저 보안팀에 용도(개인 생산성 도구, localhost 전용, 외부 API 미호출)를 설명하고 allowlist 등록을 요청하는 것이 가장 효과적인 첫 단계다.
+</div>
+
+<p style="color:var(--muted);font-size:12.5px;text-align:center;margin-top:60px;">
+  분석 기준: claude-notifier 소스코드 직접 검토 (HTTPServer.swift, main.swift, notify-hook.sh, Logger.swift, install-launchagent.sh 외) — 2026-06-01
+</p>
+
+</div>
+
+<script>
+document.querySelectorAll('.acc-item').forEach(el => {
+  el.addEventListener('click', () => el.classList.toggle('open'));
+});
+</script>
+</body>
+</html>

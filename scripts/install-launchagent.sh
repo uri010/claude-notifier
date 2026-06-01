@@ -13,6 +13,7 @@ echo "Building release binary..."
 (cd "$ROOT" && swift build -c release 2>&1 | tail -2)
 BIN="$(cd "$ROOT" && swift build -c release --show-bin-path 2>/dev/null)/ClaudeNotifier"
 [ -x "$BIN" ] || { echo "Build failed"; exit 1; }
+xattr -d com.apple.quarantine "$BIN" 2>/dev/null || true
 
 mkdir -p "$LOG_DIR"
 
