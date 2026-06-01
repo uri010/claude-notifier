@@ -52,15 +52,24 @@ struct BannerView: View {
     // MARK: Body
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            headerRow
-            summaryBlock
-            if let err = event.error, !err.isEmpty { errorRow(err) }
-            buttonRow
+        // ZStack: focus-tap on the background layer, interactive buttons on the foreground.
+        // Previously, onTapGesture on the outer VStack stole button taps in the
+        // NSHostingView + nonactivatingPanel context (plain-style buttons lose to parent gesture).
+        ZStack {
+            Color.clear
+                .contentShape(Rectangle())
+                .onTapGesture { onDecision(id, .focus) }
+
+            VStack(alignment: .leading, spacing: 10) {
+                headerRow
+                summaryBlock
+                if let err = event.error, !err.isEmpty { errorRow(err) }
+                buttonRow
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 13)
+            .frame(width: 340, alignment: .leading)
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 13)
-        .frame(width: 340, alignment: .leading)
         .background(
             VisualEffectBlur(material: .popover, blendingMode: .behindWindow)
         )
@@ -70,8 +79,6 @@ struct BannerView: View {
         )
         .clipShape(RoundedRectangle(cornerRadius: 14))
         .shadow(color: .black.opacity(0.18), radius: 16, x: 0, y: 6)
-        .contentShape(Rectangle())
-        .onTapGesture { onDecision(id, .focus) }
     }
 
     // MARK: Header
