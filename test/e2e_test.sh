@@ -276,7 +276,62 @@ else
     info "앱 미실행 — permission API 테스트 생략"
 fi
 
-# 5-g. 훅 타임아웃 → failing open (최대 3초)
+# 5-g. Allow Session 후 동일 도구 자동 허용 (세션 캐시 hit)
+# 실제 버그 재현: allowSession 클릭 후 동일 요청이 배너도 안 뜨고 자동 허용도 안 되던 문제
+section "[5-g] Allow Session → 세션 캐시 자동 허용"
+
+_SC_DIR="$HOME/.claude-notifier/sessions"
+_SC_FILE="$_SC_DIR/allowed-e2e-cache-test"
+mkdir -m 0700 -p "$_SC_DIR" 2>/dev/null
+
+# 세션 캐시에 "Write" 등록 (Allow Session 클릭 상태 시뮬레이션)
+install -m 0600 /dev/null "$_SC_FILE" 2>/dev/null || { rm -f "$_SC_FILE"; touch "$_SC_FILE"; chmod 0600 "$_SC_FILE"; }
+printf 'Write\n' >> "$_SC_FILE"
+
+CACHE_PAYLOAD='{"session_id":"e2e-cache-test","cwd":"/tmp","tool_name":"Write","tool_input":{"file_path":"/tmp/e2e.txt","content":"hello"}}'
+
+# 캐시 hit → permissionDecision:allow 출력 검증
+SC_OUT="$(printf '%s' "$CACHE_PAYLOAD" | TMUX= bash "$HOOK" pretooluse 2>/dev/null)"
+SC_ERR="$(printf '%s' "$CACHE_PAYLOAD" | TMUX= bash "$HOOK" pretooluse 2>&1 >/dev/null)"
+SC_DECISION="$(echo "$SC_OUT" | jq -r '.hookSpecificOutput.permissionDecision // empty' 2>/dev/null)"
+
+if [ "$SC_DECISION" = "allow" ]; then
+    ok "Allow Session 후 동일 도구 → 세션 캐시 hit, permissionDecision:allow 자동 허용 확인"
+else
+    fail "Allow Session 후 동일 도구 → 자동 허용 실패 (decision:${SC_DECISION:-없음}, stderr:$(echo "$SC_ERR" | tail -1))"
+fi
+
+# updatedPermissions 필드가 응답에 없음을 확인 (제거된 필드)
+if echo "$SC_OUT" | grep -q "updatedPermissions"; then
+    fail "allowSession 응답에 updatedPermissions 필드 존재 — Claude Code hook bypass 버그 유발 가능"
+else
+    ok "allowSession 응답에 updatedPermissions 없음 (세션 캐시만으로 처리)"
+fi
+
+# 비파괴적 Bash 명령도 캐시 hit
+printf 'Bash\n' >> "$_SC_FILE"
+BASH_PAYLOAD='{"session_id":"e2e-cache-test","cwd":"/tmp","tool_name":"Bash","tool_input":{"command":"git status"}}'
+BASH_OUT="$(printf '%s' "$BASH_PAYLOAD" | TMUX= bash "$HOOK" pretooluse 2>/dev/null)"
+BASH_DECISION="$(echo "$BASH_OUT" | jq -r '.hookSpecificOutput.permissionDecision // empty' 2>/dev/null)"
+[ "$BASH_DECISION" = "allow" ] \
+    && ok "Allow Session 후 비파괴적 Bash → 세션 캐시 hit, 자동 허용" \
+    || fail "Allow Session 후 비파괴적 Bash → 자동 허용 실패 (decision:${BASH_DECISION:-없음})"
+
+# 파괴적 Bash 명령은 캐시 있어도 허용 안 됨 (보안)
+RM_PAYLOAD='{"session_id":"e2e-cache-test","cwd":"/tmp","tool_name":"Bash","tool_input":{"command":"rm -f /tmp/e2e.txt"}}'
+RM_OUT="$(printf '%s' "$RM_PAYLOAD" | TMUX= bash "$HOOK" pretooluse 2>/dev/null)"
+RM_ERR="$(printf '%s' "$RM_PAYLOAD" | TMUX= bash "$HOOK" pretooluse 2>&1 >/dev/null)"
+RM_DECISION="$(echo "$RM_OUT" | jq -r '.hookSpecificOutput.permissionDecision // empty' 2>/dev/null)"
+if [ -z "$RM_DECISION" ] || [ "$RM_DECISION" != "allow" ]; then
+    ok "파괴적 Bash 명령 → 세션 캐시 있어도 자동 허용 없음 (보안 확인)"
+else
+    fail "파괴적 Bash 명령이 세션 캐시로 자동 허용됨 — 보안 문제"
+fi
+
+rm -f "$_SC_FILE"
+unset _SC_DIR _SC_FILE SC_OUT SC_ERR SC_DECISION BASH_OUT BASH_DECISION RM_OUT RM_ERR RM_DECISION
+
+# 5-i. 훅 타임아웃 → failing open (최대 3초)
 info "pretooluse 훅 — 타임아웃 경로 검증 (최대 3초 대기)"
 TIMEOUT_ERR="$(echo "$PTOOL_PAYLOAD" | CLAUDE_NOTIFIER_WAIT=3 bash "$HOOK" pretooluse 2>&1 >/dev/null)" && TO_EXIT=0 || TO_EXIT=$?
 if echo "$TIMEOUT_ERR" | grep -q "terminal focused"; then
@@ -287,7 +342,7 @@ else
     fail "pretooluse 훅 — 타임아웃 경로 오류 (exit ${TO_EXIT})"
 fi
 
-# 5-h. 알 수 없는 훅 타입 → 안전 처리
+# 5-j. 알 수 없는 훅 타입 → 안전 처리
 UNKNOWN_ERR="$(echo '{}' | bash "$HOOK" unknown_type 2>&1 >/dev/null)" && UNK_EXIT=0 || UNK_EXIT=$?
 [ "$UNK_EXIT" -eq 0 ] \
     && ok "알 수 없는 훅 타입 — exit 0으로 안전 처리" \

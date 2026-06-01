@@ -304,15 +304,16 @@ case "$HOOK_TYPE" in
           permissionDecisionReason:"Approved via notifier banner"}}'
         ;;
       allowSession)
-        # Write to session cache (0600) so this tool is auto-allowed going forward
+        # Write to session cache (0600) so this tool is auto-allowed going forward.
+        # Create file with correct permissions atomically to avoid a brief 644 window.
+        [ -f "$SESSION_CACHE" ] || install -m 0600 /dev/null "$SESSION_CACHE" 2>/dev/null
         printf '%s\n' "$TOOL_NAME" >> "$SESSION_CACHE"
-        chmod 0600 "$SESSION_CACHE" 2>/dev/null
-        jq -n --arg tool "$TOOL_NAME" \
-          '{hookSpecificOutput:{hookEventName:"PreToolUse",
-            permissionDecision:"allow",
-            permissionDecisionReason:"Allowed for session via notifier banner",
-            updatedPermissions:[{type:"addRules",rules:[{toolName:$tool}],
-              behavior:"allow",destination:"session"}]}}'
+        # Do NOT return updatedPermissions to Claude Code: that undocumented field caused
+        # Claude Code to add its own session rule, bypassing this hook on future calls
+        # and breaking the session-cache auto-allow path (no banner + no auto-allow).
+        jq -n '{hookSpecificOutput:{hookEventName:"PreToolUse",
+          permissionDecision:"allow",
+          permissionDecisionReason:"Allowed for session via notifier banner"}}'
         ;;
       deny)
         jq -n '{hookSpecificOutput:{hookEventName:"PreToolUse",
