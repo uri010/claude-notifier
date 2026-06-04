@@ -181,12 +181,13 @@ final class PanelManager {
     /// decision are NOT auto-dismissed (which would cause failing-open = allow).
     func clearInfoBanners() {
         let infos = entries.filter { !$0.needsResponse }
+        guard !infos.isEmpty else { return }   // no-op when nothing to clear (called every 1.5 s)
         for entry in infos {
             entry.panel.orderOut(nil)
             entry.panel.close()
         }
         entries.removeAll { !$0.needsResponse }
-        if !infos.isEmpty { layoutPanels() }
+        layoutPanels()
         Logger.log("BANNER_CLEAR_INFO count=\(infos.count)")
     }
 

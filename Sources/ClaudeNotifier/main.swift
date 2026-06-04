@@ -33,13 +33,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         Logger.log("WORKSPACE_CHECK frontmost=\(NSWorkspace.shared.frontmostApplication?.localizedName ?? "nil")")
         let terminals: Set<String> = ["Terminal", "터미널", "iTerm2", "iTerm",
                                       "Alacritty", "Kitty", "WezTerm", "Hyper"]
+        // prevWasTerminal is kept only for the transition log (not for the clear condition).
+        // clearInfoBanners runs on every tick while in terminal, not only on the app-level
+        // transition — this handles tmux pane/tab switches within the same Terminal.app window
+        // (those don't trigger an app-level frontmost change, so the old isTerminal&&!prev
+        // condition never fired when the user switched back to Claude's pane from another pane).
         var prevWasTerminal = false
         let focusTimer = Timer(timeInterval: 1.5, repeats: true) { _ in
             let name = NSWorkspace.shared.frontmostApplication?.localizedName ?? ""
             let isTerminal = terminals.contains(name)
             if isTerminal && !prevWasTerminal {
+                Logger.log("TERMINAL_FOCUSED app=\(name)")
+            }
+            if isTerminal {
                 Task { @MainActor in
-                    Logger.log("TERMINAL_FOCUSED app=\(name) — clearing info banners")
                     PanelManager.shared.clearInfoBanners()
                 }
             }
