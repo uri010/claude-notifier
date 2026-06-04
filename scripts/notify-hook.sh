@@ -327,6 +327,14 @@ case "$HOOK_TYPE" in
         exit 0
         ;;
       *)
+        # Hook timed out: dismiss the stale banner so the user doesn't press a button
+        # that will have no effect (the hook has already exited and Claude Code has
+        # moved on).  A /respond call with "dismiss" removes the panel cleanly.
+        if [ -n "$ID" ]; then
+            $CURL 2 -X POST "${BASE}/respond/${ID}" \
+                -H 'Content-Type: application/json' \
+                -d '{"decision":"dismiss"}' >/dev/null 2>&1 || true
+        fi
         log "no explicit decision ($DECISION), failing open"
         exit 0
         ;;
