@@ -20,7 +20,7 @@ set -uo pipefail
 HOOK_TYPE="${1:-stop}"
 PORT="${CLAUDE_NOTIFIER_PORT:-47823}"
 BASE="http://127.0.0.1:${PORT}"
-PERMISSION_WAIT="${CLAUDE_NOTIFIER_WAIT:-45}"
+PERMISSION_WAIT="${CLAUDE_NOTIFIER_WAIT:-600}"
 CURL="curl -s --max-time"
 SETTINGS_FILE="$HOME/.claude/settings.json"
 
@@ -327,14 +327,6 @@ case "$HOOK_TYPE" in
         exit 0
         ;;
       *)
-        # Hook timed out: dismiss the stale banner so the user doesn't press a button
-        # that will have no effect (the hook has already exited and Claude Code has
-        # moved on).  A /respond call with "dismiss" removes the panel cleanly.
-        if [ -n "$ID" ]; then
-            $CURL 2 -X POST "${BASE}/respond/${ID}" \
-                -H 'Content-Type: application/json' \
-                -d '{"decision":"dismiss"}' >/dev/null 2>&1 || true
-        fi
         log "no explicit decision ($DECISION), failing open"
         exit 0
         ;;
