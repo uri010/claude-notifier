@@ -9,45 +9,18 @@ permissions:
   contents: write
 
 jobs:
-  build-arm64:
-    runs-on: macos-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Build arm64
-        run: swift build -c release --arch arm64
-
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: ClaudeNotifier-arm64
-          path: .build/arm64-apple-macosx/release/ClaudeNotifier
-
-  build-x86_64:
-    runs-on: macos-13
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Build x86_64
-        run: swift build -c release
-
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: ClaudeNotifier-x86_64
-          path: .build/release/ClaudeNotifier
-
   release:
-    needs: [build-arm64, build-x86_64]
     runs-on: macos-latest
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/checkout@v4
 
-      - name: Create universal binary
+      - name: Build universal binary (arm64 + x86_64)
         run: |
+          swift build -c release --arch arm64
+          swift build -c release --arch x86_64
           lipo -create \
-            ClaudeNotifier-arm64/ClaudeNotifier \
-            ClaudeNotifier-x86_64/ClaudeNotifier \
+            .build/arm64-apple-macosx/release/ClaudeNotifier \
+            .build/x86_64-apple-macosx/release/ClaudeNotifier \
             -output ClaudeNotifier
           file ClaudeNotifier
 
