@@ -41,6 +41,107 @@ enum TmuxFocus {
         return false
     }
 
+    // MARK: - Focus scoping (auto-dismiss)
+
+    /// Mirrors notify-hook.sh's is_terminal_focused(): true only when the
+    /// frontmost terminal's VISIBLE tab/pane is the exact one this event came
+    /// from — not just "some terminal app is frontmost". Used to scope
+    /// auto-dismiss so banners from other sessions/panes the user isn't
+    /// looking at are not cleared as a side effect.
+    static func matchesFrontmost(event: EventRequest, frontmostApp: String, frontmostTTY: String?) -> Bool {
+        switch frontmostApp {
+        case "Alacritty", "Kitty", "WezTerm", "Hyper":
+            // Single-window terminals: frontmost implies the user is watching
+            // whatever session runs there.
+            return true
+        case "Terminal", "터미널", "iTerm2", "iTerm":
+            break
+        default:
+            return false
+        }
+
+        guard let raw = frontmostTTY, !raw.isEmpty else { return false }
+        let ft = raw.hasPrefix("/dev/") ? String(raw.dropFirst(5)) : raw
+
+        if let session = event.tmuxSession, !session.isEmpty {
+            // tmux mode: the visible tab must be a client attached to this
+            // event's session AND must currently be viewing the same
+            // window+pane the event came from (otherwise any pane in the
+            // session would suppress banners from every other pane in it).
+            guard let target = event.tmuxTarget,
+                  let lastColon = target.lastIndex(of: ":"),
+                  let lastDot = target.lastIndex(of: "."),
+                  lastDot > lastColon else { return false }
+            let ourWin  = String(target[target.index(after: lastColon)..<lastDot])
+            let ourPane = String(target[target.index(after: lastDot)...])
+
+            let tmuxPath = resolveTmuxPath()
+            for client in clientNames(tmuxPath: tmuxPath, session: session) {
+                let bare = client.hasPrefix("/dev/") ? String(client.dropFirst(5)) : client
+                guard bare == ft else { continue }
+                let cliWin  = displayMessage(tmuxPath: tmuxPath, client: client, format: "#I")
+                let cliPane = displayMessage(tmuxPath: tmuxPath, client: client, format: "#P")
+                if cliWin == ourWin && cliPane == ourPane { return true }
+            }
+            return false
+        }
+
+        if let tty = event.tty, !tty.isEmpty, tty != "??" {
+            let dev = tty.hasPrefix("/dev/") ? String(tty.dropFirst(5)) : tty
+            return dev == ft
+        }
+        return false
+    }
+
+    /// Resolves the tty of the visible tab/session in the frontmost terminal
+    /// app, or nil when it can't be determined (unsupported app / AppleScript
+    /// failure) — callers must treat nil as "not focused" (fail closed).
+    static func frontmostTerminalTTY(appName: String) -> String? {
+        switch appName {
+        case "Terminal", "터미널":
+            return runOsascript("tell application \"Terminal\" to return tty of selected tab of front window")
+        case "iTerm2", "iTerm":
+            return runOsascript("tell application \"iTerm2\" to return tty of current session of current window")
+        default:
+            return nil
+        }
+    }
+
+    private static func clientNames(tmuxPath: String, session: String) -> [String] {
+        runCapture(tmuxPath, ["list-clients", "-t", session, "-F", "#{client_name}"])
+            .split(separator: "\n").map(String.init)
+    }
+
+    private static func displayMessage(tmuxPath: String, client: String, format: String) -> String? {
+        let out = runCapture(tmuxPath, ["display-message", "-c", client, "-p", format])
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        return out.isEmpty ? nil : out
+    }
+
+    private static func runCapture(_ path: String, _ args: [String]) -> String {
+        let proc = Process()
+        proc.executableURL = URL(fileURLWithPath: path)
+        proc.arguments = args
+        let pipe = Pipe()
+        proc.standardOutput = pipe
+        proc.standardError = Pipe()
+        do { try proc.run(); proc.waitUntilExit() } catch { return "" }
+        return String(data: pipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
+    }
+
+    private static func runOsascript(_ script: String) -> String? {
+        let proc = Process()
+        proc.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
+        proc.arguments = ["-e", script]
+        let pipe = Pipe()
+        proc.standardOutput = pipe
+        proc.standardError = Pipe()
+        do { try proc.run(); proc.waitUntilExit() } catch { return nil }
+        let out = String(data: pipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8)?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        return (out?.isEmpty ?? true) ? nil : out
+    }
+
     // MARK: - Private
 
     /// Finds the exact "session:window.pane" target by matching the pane's pty.
